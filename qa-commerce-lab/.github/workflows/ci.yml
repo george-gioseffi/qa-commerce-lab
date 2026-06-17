@@ -1,0 +1,76 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  qa-pipeline:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: qa_commerce_lab
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d qa_commerce_lab"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/qa_commerce_lab?schema=public
+      JWT_SECRET: super-secret-key
+      PORT: 3333
+      FRONTEND_URL: http://127.0.0.1:4173
+      VITE_PROXY_TARGET: http://127.0.0.1:3333
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Generate Prisma client
+        run: npm run db:generate
+
+      - name: Push schema
+        run: npm run db:push
+
+      - name: Seed database
+        run: npm run db:seed
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: API tests
+        run: npm run test:api:local
+
+      - name: Install Playwright Browsers
+        run: npm run install:browsers --workspace @qa-commerce-lab/e2e
+
+      - name: E2E tests
+        run: npm run test:e2e:local
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: tests/e2e/playwright-report

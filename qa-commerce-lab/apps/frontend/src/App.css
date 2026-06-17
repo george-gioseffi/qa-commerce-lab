@@ -1,0 +1,160 @@
+.page-shell {
+  min-height: 100vh;
+  padding: 32px;
+  color: #11211b;
+  background:
+    radial-gradient(circle at top left, rgba(255, 197, 102, 0.36), transparent 30%),
+    linear-gradient(135deg, #f3efe2 0%, #dfe8d6 45%, #e8f3f8 100%);
+}
+
+.hero {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  align-items: end;
+  padding: 32px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 24px 48px rgba(17, 33, 27, 0.08);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  font-size: 0.9rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.6rem, 5vw, 4.8rem);
+  line-height: 0.95;
+}
+
+.hero-copy {
+  max-width: 62ch;
+  color: #30453c;
+}
+
+.hero-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.hero-chip,
+.card,
+.product-card {
+  border: 1px solid rgba(17, 33, 27, 0.08);
+}
+
+.hero-chip {
+  padding: 14px 18px;
+  border-radius: 999px;
+  background: rgba(250, 248, 241, 0.8);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.toolbar,
+.card-header,
+.cart-item,
+.product-card__meta,
+.cart-item__actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.toolbar input,
+.toolbar select,
+.auth-form input,
+.cart-item__actions input {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 33, 27, 0.15);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.product-card,
+.card {
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.76);
+  overflow: hidden;
+}
+
+.product-card img {
+  width: 100%;
+  height: 190px;
+  object-fit: cover;
+}
+
+.product-card__content,
+.card {
+  padding: 18px;
+}
+
+.product-card__category {
+  margin: 0;
+  color: #687a71;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.76rem;
+}
+
+.sidebar {
+  display: grid;
+  gap: 18px;
+}
+
+.auth-form {
+  display: grid;
+  gap: 12px;
+}
+
+button {
+  border: none;
+  border-radius: 14px;
+  padding: 12px 16px;
+  cursor: pointer;
+  background: #153f32;
+  color: white;
+  font-weight: 700;
+}
+
+.text-button {
+  padding: 0;
+  background: transparent;
+  color: #153f32;
+}
+
+.error-banner {
+  color: #8a1c1c;
+  font-weight: 700;
+}
+
+.success-card {
+  background: #153f32;
+  color: white;
+}
+
+@media (max-width: 960px) {
+  .page-shell,
+  .hero,
+  .layout {
+    grid-template-columns: 1fr;
+  }
+}

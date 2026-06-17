@@ -1,0 +1,8 @@
+{
+  "name": "@qa-commerce-lab/load",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "test": "k6 run scripts/api-load.js"
+  }
+}
