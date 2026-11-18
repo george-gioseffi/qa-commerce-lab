@@ -175,6 +175,8 @@ jobs:
         run: npm ci
       - name: Install Chromium
         run: npx playwright install chromium
+      - name: Build frontend for visual comparison
+        run: npm run build:frontend
       - name: Compare reviewed visual baseline
         run: npm run test:visual --workspace @qa-commerce-lab/e2e
       - name: Upload visual report

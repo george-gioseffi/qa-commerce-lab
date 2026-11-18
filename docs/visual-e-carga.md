@@ -2,7 +2,7 @@
 
 ## Visual
 
-`npm run test:visual --workspace @qa-commerce-lab/e2e` compara o cabeçalho da página com uma captura real revisada em Windows, usando o Chromium instalado pelo Playwright. A imagem de referência está versionada em `tests/e2e/tests/visual.spec.ts-snapshots/`. O cenário fixa viewport 1280 × 720, escala 1, tema claro e animações reduzidas; o catálogo é substituído por uma resposta vazia para evitar depender de imagens externas. A tolerância é de até 0,1% dos pixels.
+Após `npm run build:frontend`, `npm run test:visual --workspace @qa-commerce-lab/e2e` serve o bundle compilado e compara o cabeçalho da página com uma captura real revisada em Windows, usando o Chromium instalado pelo Playwright. A imagem de referência está versionada em `tests/e2e/tests/visual.spec.ts-snapshots/`. O cenário fixa viewport 1280 × 720, escala 1, tema claro e animações reduzidas; o catálogo é substituído por uma resposta vazia para evitar depender de imagens externas. A tolerância é de até 0,1% dos pixels.
 
 Uma alteração temporária de cor no título foi detectada pelo teste; depois de restaurar a folha de estilo, a comparação voltou a passar. A execução principal no Linux marca este cenário como **ignorado**, pois a referência é Windows; o job `visual-windows` faz a comparação no Windows. A imagem não é uma referência portátil entre sistemas, versões de fonte ou browsers. Diferenças devem ser examinadas antes de qualquer atualização de referência.
 

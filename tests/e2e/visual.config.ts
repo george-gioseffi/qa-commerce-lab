@@ -8,7 +8,9 @@ export default defineConfig({
   use: { baseURL: "http://127.0.0.1:4173", trace: "retain-on-failure", screenshot: "only-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: "npm run dev:frontend",
+    // Serve the built bundle: Vite's development module fan-out exhausted
+    // socket buffers on a Windows runner before React could mount.
+    command: "npm run preview --workspace @qa-commerce-lab/frontend -- --host 127.0.0.1 --strictPort",
     port: 4173,
     reuseExistingServer: false,
     cwd: "../../",
