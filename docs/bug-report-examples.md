@@ -1,56 +1,31 @@
-# Bug Report Examples
+# Registro de defeito: alteração de carrinho durante o checkout
 
-## BUG-001
-- Title: Checkout allowed empty order creation
-- Environment: Local Docker
-- Severity: Critical
-- Priority: High
-- Steps to reproduce: Login, leave cart empty, call checkout endpoint
-- Expected result: Request blocked with validation message
-- Actual result: Empty order was created
-- Expected evidence: API response body and order row in database
-- Status: Fixed
+- **ID:** BUG-CHECKOUT-001
+- **Severidade:** alta
+- **Prioridade:** alta
+- **Ambiente:** backend local, PostgreSQL de teste isolado, Node.js e Supertest
+- **Situação:** corrigido na branch do PR; regressão automatizada adicionada.
 
-## BUG-002
-- Title: Cart accepted quantity above available stock
-- Environment: CI and local node environment
-- Severity: High
-- Priority: High
-- Steps to reproduce: Login, add 999 units of a seeded product
-- Expected result: Quantity rejected
-- Actual result: Cart item persisted
-- Expected evidence: API request payload, response and DB row
-- Status: Fixed
+## Pré-condições
 
-## BUG-003
-- Title: Duplicate email registration returned 500 instead of 409
-- Environment: Local backend
-- Severity: Medium
-- Priority: High
-- Steps to reproduce: Register twice with the same email
-- Expected result: Conflict response
-- Actual result: Unhandled exception
-- Expected evidence: Server logs and response status
-- Status: Fixed
+Conta de teste autenticada, produto disponível e uma unidade no carrinho.
 
-## BUG-004
-- Title: Search field was missing stable selector for automation
-- Environment: E2E suite
-- Severity: Low
-- Priority: Medium
-- Steps to reproduce: Attempt to automate search using UI text selector
-- Expected result: Stable data-testid available
-- Actual result: Selector depended on placeholder text only
-- Expected evidence: Test source and DOM snapshot
-- Status: Fixed
+## Reprodução controlada
 
-## BUG-005
-- Title: Anonymous checkout error message was not visible in UI
-- Environment: Frontend local app
-- Severity: Medium
-- Priority: Medium
-- Steps to reproduce: Open app, click checkout without logging in
-- Expected result: Clear blocking feedback displayed
-- Actual result: Request failed silently for the user
-- Expected evidence: Screen recording and browser console
-- Status: Fixed
+1. Iniciar um checkout e interrompê-lo temporariamente após a leitura do carrinho.
+2. Alterar a quantidade do item de 1 para 2 por outra requisição.
+3. Retomar o checkout.
+
+Antes da correção, a requisição retornou `201` e criou um pedido com a quantidade antiga, descartando a alteração concorrente. A condição foi reproduzida com uma barreira sincronizada em PostgreSQL de teste.
+
+## Resultado esperado
+
+O checkout deve detectar o conflito, retornar `409` e preservar o carrinho atualizado, sem criar pedido com dados antigos.
+
+## Correção e evidência
+
+O checkout usa uma transação serializável e converte conflitos de serialização em `409`. O teste `rejects checkout if the cart quantity changes after it was read`, em `apps/backend/src/test/api.spec.ts`, força a sequência acima e verifica o status, a ausência de pedidos e a preservação do carrinho.
+
+O commit `4aa5f1c` contém a correção e o teste. Os artefatos da execução do workflow ficam disponíveis na [execução do GitHub Actions](https://github.com/george-gioseffi/qa-commerce-lab/actions/runs/44307461733); a disponibilidade dos artefatos está sujeita à retenção do GitHub.
+
+O teste cobre essa sequência específica; ele não comprova ausência de todas as condições de corrida possíveis. Este registro é mantido no repositório e ainda não corresponde a uma issue separada no GitHub.

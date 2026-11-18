@@ -203,7 +203,7 @@ Os arquivos em `docs/` complementam o projeto com visão de qualidade:
 
 - `test-plan.md`: escopo, critérios, ambientes e abordagem geral de teste
 - `test-cases.md`: casos de teste rastreáveis por funcionalidade e prioridade
-- `bug-report-examples.md`: exemplos realistas de defeitos documentados
+- `bug-report-examples.md`: defeito de concorrência reproduzido, correção e teste de regressão
 - `qa-strategy.md`: estratégia de camadas, trade-offs e redução de fragilidade
 - `risk-analysis.md`: riscos principais, impacto, mitigação e cobertura relacionada
 - `github-audit-2026.md`: auditoria comparativa dos repositórios e diagnóstico estrutural
@@ -256,7 +256,7 @@ Este projeto demonstra capacidade de:
 
 ## Próximas melhorias
 
-- testes visuais
+- ampliar testes visuais além do cabeçalho e do Chromium em Windows
 - contract testing
 - mutation testing
 - SonarCloud
