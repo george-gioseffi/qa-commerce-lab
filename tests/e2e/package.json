@@ -8,6 +8,7 @@
     "test:ui": "playwright test --ui",
     "test:a11y": "playwright test --grep accessibility",
     "test:visual": "playwright test --config visual.config.ts",
+    "demo:failure": "playwright test --config demo.config.ts",
     "report": "playwright show-report",
     "install:browsers": "playwright install --with-deps chromium"
   },

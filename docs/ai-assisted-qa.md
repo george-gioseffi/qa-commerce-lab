@@ -16,6 +16,8 @@ A IA neste repositório **auxilia o trabalho de QA** sem substituir testes deter
 | `npm run ai:analyze` | Lê `tests/e2e/test-results/results.json`, sanitiza falhas e classifica causa raiz | `reports/ai-failure-analysis.json` |
 | `npm run ai:evaluate` | Executa benchmark contra dataset rotulado (`tools/ai-qa/benchmark/known-failures.json`) | `reports/ai-benchmark.json` |
 | `npm run ai:matrix` | Procura candidatos por palavras nos títulos de testes; exige revisão humana | `reports/traceability-matrix.json` |
+| `npm run ai:traceability` | Verifica se referências revisadas existem, sem afirmar execução | `reports/reviewed-traceability.json` |
+| `npm run ai:scenarios` | Propõe cenários a partir de lacunas curadas, para revisão | `reports/scenario-proposals.json` |
 | `npm run ai:prioritize` | Mapeia arquivos alterados no `git diff` para sugerir ordem de execução de suítes | stdout JSON |
 | `npm run ai:report` | Consolida métricas reais de Playwright, matriz e benchmark em relatório executivo | `reports/executive-summary.md` e `.json` |
 | `npm run test:ai` | Testes unitários do sanitizador e classificador | stdout TAP/node:test |
@@ -26,4 +28,6 @@ A IA neste repositório **auxilia o trabalho de QA** sem substituir testes deter
 - No benchmark, acurácia é o número de rótulos corretos dividido pelo total de exemplos. `falsePositiveCount` conta exemplos com rótulo diferente do esperado e que não são `UNCLASSIFIED`; abstenções são contadas em `unclassifiedCount`, e aquelas em que se esperava uma classe em `missedClassificationCount`. Esses números são contagens por exemplo, não precisão ou recall por classe.
 - O adaptador externo recebe somente sinais resumidos, o que reduz o contexto disponível para o diagnóstico. A configuração de um provedor real deve ser testada separadamente; o benchmark atual avalia apenas o classificador determinístico.
 - A matriz busca palavras nos títulos em uma lista específica de arquivos. Correspondências podem ser incorretas ou incompletas e não comprovam que um requisito esteja coberto ou que um teste tenha sido executado.
+- A matriz revisada é limitada aos cinco requisitos de [rastreabilidade](rastreabilidade.md); a verificação automática só confirma que o título permanece no arquivo. Propostas de cenários são determinísticas, não geradas por modelo, e não entram automaticamente na suíte.
+- Em um evento de pull request, a priorização compara os commits base e head do evento; não depende de arquivos não commitados. Use `npm run ai:prioritize -- --base <base> --head <head>` para comparar commits localmente, com histórico disponível. Fora de PR e sem argumentos, o comando informa que usa alterações locais não commitadas. Uma comparação indisponível falha explicitamente e não deve ser interpretada como ausência de mudanças.
 - A priorização de PR sugere ordem de feedback rápido, mas o pipeline completo de CI continua obrigatório antes do merge.

@@ -4,6 +4,8 @@ coverage
 playwright-report
 visual-report
 test-results
+demo-report
+demo-test-results
 .env
 .env.local
 .env.test

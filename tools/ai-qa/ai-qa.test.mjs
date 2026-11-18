@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { summarizeBenchmark } from "./benchmark-summary.mjs";
+import { prioritize } from "./prioritize.mjs";
 import test from "node:test";
 import { analyzeFailure, classifyFailureDeterministic, FAILURE_CATEGORIES } from "./classifier.mjs";
 import { sanitizeText } from "./sanitizer.mjs";
@@ -120,4 +123,68 @@ test("classifyFailureDeterministic separates evidence from hypothesis and never 
   assert.equal(result.verifiedAfterFix, false);
   assert.ok(result.evidence.sanitizedError.includes("409 Conflict"));
   assert.ok(result.hypothesis.length > 0);
+});
+
+test("a located element with an incorrect count is not treated as selector drift", () => {
+  const result = classifyFailureDeterministic({
+    error: "expect(locator).toHaveCount failed: getByTestId('catalog-error') Expected: 0 Received: 1",
+  });
+  assert.equal(result.category, FAILURE_CATEGORIES.ASSERTION_MISMATCH);
+  assert.equal(result.verifiedAfterFix, false);
+  const ambiguous = classifyFailureDeterministic({ error: "strict mode violation: getByRole('button') resolved to 2 elements" });
+  assert.equal(ambiguous.category, FAILURE_CATEGORIES.SELECTOR_DRIFT);
+  assert.equal(ambiguous.confidence, "medium");
+});
+
+test("PR prioritization reads committed changes between base and head in a clean checkout", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "qa-prioritize-"));
+  const git = (...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+  try {
+    git("init");
+    git("config", "user.email", "qa-test@example.invalid");
+    git("config", "user.name", "QA Test");
+    fs.mkdirSync(path.join(dir, "apps/backend/src"), { recursive: true });
+    fs.writeFileSync(path.join(dir, "apps/backend/src/auth.ts"), "original\n");
+    git("add", ".");
+    git("commit", "-m", "base");
+    const base = git("rev-parse", "HEAD");
+    fs.writeFileSync(path.join(dir, "apps/backend/src/auth.ts"), "changed\n");
+    git("add", ".");
+    git("commit", "-m", "change auth");
+    const head = git("rev-parse", "HEAD");
+    assert.equal(git("status", "--porcelain"), "");
+    const eventPath = path.join(dir, "event.json");
+    fs.writeFileSync(eventPath, JSON.stringify({ pull_request: { base: { sha: base }, head: { sha: head } } }));
+    const eventEnv = { GITHUB_EVENT_NAME: "pull_request", GITHUB_EVENT_PATH: eventPath };
+    const result = prioritize([], { cwd: dir, env: eventEnv });
+    assert.equal(result.source, "pull-request");
+    assert.deepEqual(result.changedFiles, ["apps/backend/src/auth.ts"]);
+    assert.ok(result.prioritizedSuites.includes("tests/e2e/tests/auth.spec.ts"));
+    assert.match(result.note, /Full CI/);
+    assert.deepEqual(prioritize(["--base", base, "--head", head], { cwd: dir, env: {} }).changedFiles, result.changedFiles);
+    assert.throws(() => prioritize([], { cwd: dir, env: { GITHUB_EVENT_NAME: "pull_request" } }), /event path is missing/);
+    fs.writeFileSync(eventPath, JSON.stringify({ pull_request: { base: { sha: "a".repeat(40) }, head: { sha: head } } }));
+    assert.throws(() => prioritize([], { cwd: dir, env: eventEnv }), /Fetch the base and head/);
+    git("mv", "apps/backend/src/auth.ts", "apps/backend/src/other.ts");
+    git("commit", "-m", "rename auth");
+    const renamed = prioritize(["--base", head, "--head", git("rev-parse", "HEAD")], { cwd: dir, env: {} });
+    assert.ok(renamed.changedFiles.includes("apps/backend/src/auth.ts"));
+    assert.ok(renamed.changedFiles.includes("apps/backend/src/other.ts"));
+    assert.ok(renamed.prioritizedSuites.includes("tests/e2e/tests/auth.spec.ts"));
+  } finally {
+    assert.ok(path.resolve(dir).startsWith(path.resolve(os.tmpdir()) + path.sep));
+    assert.ok(path.basename(dir).startsWith("qa-prioritize-"));
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("prioritization distinguishes explicit paths and local uncommitted changes", () => {
+  const result = prioritize(["apps/backend/src/modules/checkout/checkout.routes.ts"]);
+  assert.equal(result.source, "explicit-files");
+  assert.ok(result.prioritizedSuites.includes("tests/e2e/tests/cart-checkout.spec.ts"));
+  assert.throws(() => prioritize(["--base", "HEAD"]), /Both --base and --head/);
+  assert.throws(() => prioritize(["--base", "HEAD", "--head", "HEAD", "auth.ts"]), /not both/);
+  const aiChange = prioritize(["tools/ai-qa/cli.mjs", "unmapped-document.md"]);
+  assert.ok(aiChange.prioritizedSuites.includes("tools/ai-qa/ai-qa.test.mjs"));
+  assert.deepEqual(aiChange.unmappedFiles, ["unmapped-document.md"]);
 });

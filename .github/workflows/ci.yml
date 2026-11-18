@@ -95,6 +95,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -125,9 +127,26 @@ jobs:
       - name: E2E & Accessibility tests
         run: npm run test:e2e:local
 
+      - name: Capture and verify controlled failure trace
+        run: |
+          if npm run demo:failure --workspace @qa-commerce-lab/e2e; then
+            echo "::error::The controlled failure unexpectedly passed"
+            exit 1
+          else
+            node scripts/verify-controlled-demo.mjs
+          fi
+          npm run ai:analyze -- --offline --results tests/e2e/demo-test-results/results.json --output demo-failure-analysis.json
+
       - name: Generate AI QA Executive Report
         if: always()
-        run: npm run ai:report
+        run: |
+          npm run ai:report
+          npm run ai:traceability
+          npm run ai:scenarios
+
+      - name: Suggest PR test order
+        if: github.event_name == 'pull_request'
+        run: node tools/ai-qa/cli.mjs prioritize > reports/test-priority.json
 
       - name: Upload Playwright report & AI QA reports
         if: always()
@@ -137,6 +156,8 @@ jobs:
           path: |
             tests/e2e/playwright-report
             tests/e2e/test-results
+            tests/e2e/demo-report
+            tests/e2e/demo-test-results
             reports
 
   visual-windows:

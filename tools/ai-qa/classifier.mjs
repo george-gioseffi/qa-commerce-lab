@@ -35,9 +35,9 @@ const RULES = [
   },
   {
     category: FAILURE_CATEGORIES.SELECTOR_DRIFT,
-    confidence: "high",
-    patterns: [/getByTestId/i, /getByRole/i, /locator\(/i, /strict mode violation/i, /waiting for locator/i],
-    hypothesis: "UI element locator did not match DOM or matched multiple elements due to UI change.",
+    confidence: "medium",
+    patterns: [/strict mode violation/i, /waiting for locator to be (?:visible|attached)/i, /resolved to \d+ elements/i],
+    hypothesis: "The locator did not reach the expected state or matched multiple elements; selector drift is one possible cause.",
     recommendation: "Inspect DOM snapshot/trace and align Page Object locator with accessible role or data-testid.",
   },
   {

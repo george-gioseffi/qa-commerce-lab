@@ -46,9 +46,11 @@
     "ai:analyze": "node tools/ai-qa/cli.mjs analyze-failures",
     "ai:evaluate": "node tools/ai-qa/cli.mjs evaluate-ai",
     "ai:matrix": "node tools/ai-qa/cli.mjs coverage-matrix",
+    "ai:traceability": "node tools/ai-qa/cli.mjs reviewed-traceability",
+    "ai:scenarios": "node tools/ai-qa/cli.mjs scenario-proposals",
     "ai:prioritize": "node tools/ai-qa/cli.mjs prioritize",
     "ai:report": "node tools/ai-qa/cli.mjs executive-report",
-    "test:ai": "node --test tools/ai-qa/ai-qa.test.mjs",
+    "test:ai": "node --test tools/ai-qa/ai-qa.test.mjs tools/ai-qa/reviewed-traceability.test.mjs",
     "test:safety": "node --test scripts/safety.test.mjs && tsx --test apps/backend/prisma/seed-policy.test.ts"
   },
   "engines": {

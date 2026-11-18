@@ -139,6 +139,8 @@ npm run test:e2e:report
 npm run test:ai
 npm run ai:evaluate
 npm run ai:matrix
+npm run ai:traceability
+npm run ai:scenarios
 npm run ai:report
 npm run test:all
 ```
@@ -209,6 +211,8 @@ Os arquivos em `docs/` complementam o projeto com visão de qualidade:
 - `github-audit-2026.md`: auditoria comparativa dos repositórios e diagnóstico estrutural
 - `ai-assisted-qa.md`: arquitetura do módulo de AI-Assisted QA, sanitização e benchmark
 - `visual-e-carga.md`: baseline visual Windows e medições locais de carga com limitações
+- `rastreabilidade.md`: requisitos revisados, referências aos testes e lacunas conhecidas
+- `demonstracao.md`: roteiro reproduzível, incluindo falha controlada com trace
 
 ## Solução de problemas
 

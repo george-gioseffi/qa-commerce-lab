@@ -404,6 +404,53 @@ describe("API contract and integration coverage", () => {
       }
     }, 20000);
 
+    it("allows at most one order when two users compete for the last unit", async () => {
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const users: Array<{ id: string; token: string }> = [];
+      let productId: string | undefined;
+      try {
+        for (const index of [1, 2]) {
+          const response = await request(app).post("/api/auth/register").send({
+            name: `Stock race ${index}`,
+            email: `stock-race-${unique}-${index}@example.com`,
+            password: "Password123!",
+          });
+          expect(response.status).toBe(201);
+          users.push({ id: response.body.user.id, token: response.body.token });
+        }
+        const product = await prisma.product.create({ data: {
+          name: `Last unit ${unique}`, description: "Synthetic isolated product",
+          category: "Test", priceInCents: 2500, stock: 1, imageUrl: "https://example.invalid/product.png",
+        } });
+        productId = product.id;
+        for (const user of users) {
+          const response = await request(app).post("/api/cart/items")
+            .set("Authorization", `Bearer ${user.token}`)
+            .send({ productId, quantity: 1 });
+          expect(response.status).toBe(201);
+        }
+
+        const responses = await Promise.all(users.map((user) => request(app).post("/api/checkout")
+          .set("Authorization", `Bearer ${user.token}`).send()));
+        expect(responses.map((response) => response.status).sort()).toEqual([201, 409]);
+        const orders = await prisma.order.findMany({ where: { userId: { in: users.map((user) => user.id) } }, include: { items: true } });
+        expect(orders).toHaveLength(1);
+        const order = orders[0];
+        if (!order) throw new Error("Expected exactly one order");
+        expect(order.items).toHaveLength(1);
+        const item = order.items[0];
+        if (!item) throw new Error("Expected exactly one order item");
+        expect(item.productId).toBe(productId);
+        expect(item.quantity).toBe(1);
+        expect((await prisma.product.findUniqueOrThrow({ where: { id: productId } })).stock).toBe(0);
+        expect(await prisma.cartItem.count({ where: { productId } })).toBe(1);
+      } finally {
+        // Only remove this test's synthetic accounts and product in the isolated test database.
+        if (users.length) await prisma.user.deleteMany({ where: { id: { in: users.map((user) => user.id) } } });
+        if (productId) await prisma.product.delete({ where: { id: productId } });
+      }
+    });
+
     it("prevents overselling when stock drops before checkout", async () => {
       const dockProduct = await prisma.product.findFirstOrThrow({
         where: { name: "USB-C Dock" },

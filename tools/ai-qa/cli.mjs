@@ -4,6 +4,8 @@ import path from "node:path";
 import { summarizeBenchmark } from "./benchmark-summary.mjs";
 import { analyzeFailure, classifyFailureDeterministic } from "./classifier.mjs";
 import { sanitizeText } from "./sanitizer.mjs";
+import { changedFiles, prioritize } from "./prioritize.mjs";
+import { buildReviewedTraceability, proposeReviewedScenarios } from "./reviewed-traceability.mjs";
 
 const rootDir = process.cwd();
 const reportsDir = path.join(rootDir, "reports");
@@ -13,16 +15,19 @@ function ensureDir(dir) {
 }
 
 function getGitMeta() {
+  let sha = "unknown";
+  let branch = "unknown";
   try {
-    const sha = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
-    const branch = execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf8" }).trim();
-    const changed = execSync("git diff --name-only HEAD", { encoding: "utf8" })
-      .split(/\r?\n/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    return { sha, branch, changed };
+    sha = execSync("git rev-parse --short HEAD", { encoding: "utf8" }).trim();
+    branch = execSync("git rev-parse --abbrev-ref HEAD", { encoding: "utf8" }).trim();
   } catch {
-    return { sha: "unknown", branch: "unknown", changed: [] };
+    // Git metadata is optional for local reports.
+  }
+  try {
+    const result = changedFiles();
+    return { sha, branch, changed: result.changedFiles, changeSource: result.source, changeError: null };
+  } catch (error) {
+    return { sha, branch, changed: [], changeSource: "unavailable", changeError: error.message };
   }
 }
 
@@ -51,10 +56,12 @@ function walkPlaywrightSuites(suites, collected = []) {
   return collected;
 }
 
-async function runAnalyzeFailures() {
+async function runAnalyzeFailures({ resultsPath, outputName = "ai-failure-analysis.json", offline = false } = {}) {
   ensureDir(reportsDir);
+  if (!/^[a-z0-9][a-z0-9._-]*\.json$/i.test(outputName)) throw new Error("Output must be a simple JSON filename.");
   const git = getGitMeta();
-  const pwResultsPath = path.join(rootDir, "tests/e2e/test-results/results.json");
+  const pwResultsPath = resultsPath ? path.resolve(rootDir, resultsPath) : path.join(rootDir, "tests/e2e/test-results/results.json");
+  const outputPath = path.join(reportsDir, outputName);
 
   if (!fs.existsSync(pwResultsPath)) {
     const output = {
@@ -63,8 +70,10 @@ async function runAnalyzeFailures() {
       status: "NO_PLAYWRIGHT_RESULTS_FOUND",
       analyzedCount: 0,
       analyses: [],
+      changeSource: git.changeSource,
+      changeError: git.changeError,
     };
-    fs.writeFileSync(path.join(reportsDir, "ai-failure-analysis.json"), JSON.stringify(output, null, 2));
+    fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
     console.log("No Playwright results.json found. Wrote empty analysis report.");
     return output;
   }
@@ -76,7 +85,7 @@ async function runAnalyzeFailures() {
   const analyses = [];
   for (const item of failed) {
     analyses.push(
-      await analyzeFailure({
+      await (offline ? classifyFailureDeterministic : analyzeFailure)({
         name: item.title,
         file: item.file,
         durationMs: item.durationMs,
@@ -93,9 +102,11 @@ async function runAnalyzeFailures() {
     totalRunsObserved: runs.length,
     failedCount: failed.length,
     analyses,
+    changeSource: git.changeSource,
+    changeError: git.changeError,
   };
 
-  fs.writeFileSync(path.join(reportsDir, "ai-failure-analysis.json"), JSON.stringify(output, null, 2));
+  fs.writeFileSync(outputPath, JSON.stringify(output, null, 2));
   console.log(`Analyzed ${failed.length} failure(s) out of ${runs.length} E2E result(s).`);
   return output;
 }
@@ -196,33 +207,46 @@ function runCoverageMatrix() {
   return output;
 }
 
-function runPrioritize(filesArg) {
+function runReviewedTraceability() {
+  ensureDir(reportsDir);
   const git = getGitMeta();
-  const changed = filesArg.length > 0 ? filesArg : git.changed;
-
-  const priorityRules = [
-    { match: /auth/i, suites: ["apps/backend/src/test/api.spec.ts", "tests/e2e/tests/auth.spec.ts", "tests/e2e/tests/smoke.spec.ts"] },
-    { match: /cart|checkout|orders/i, suites: ["apps/backend/src/test/unit.spec.ts", "apps/backend/src/test/api.spec.ts", "tests/e2e/tests/cart-checkout.spec.ts"] },
-    { match: /products/i, suites: ["apps/backend/src/test/api.spec.ts", "tests/e2e/tests/catalog.spec.ts"] },
-    { match: /frontend\/src/i, suites: ["tests/e2e/tests/smoke.spec.ts", "tests/e2e/tests/accessibility.spec.ts"] },
-  ];
-
-  const suggested = new Set();
-  for (const file of changed) {
-    for (const rule of priorityRules) {
-      if (rule.match.test(file)) {
-        rule.suites.forEach((s) => suggested.add(s));
-      }
-    }
-  }
-
-  const result = {
-    changedFiles: changed,
-    prioritizedSuites: [...suggested],
-    note: "Full CI pipeline remains mandatory before merge.",
+  const references = buildReviewedTraceability(rootDir);
+  const output = {
+    generatedAt: new Date().toISOString(),
+    commit: git.sha,
+    note: "Curated references are checked for existence only, not execution or success; inspect CI artifacts for this commit.",
+    references,
   };
-  console.log(JSON.stringify(result, null, 2));
-  return result;
+  fs.writeFileSync(path.join(reportsDir, "reviewed-traceability.json"), JSON.stringify(output, null, 2));
+  const missing = references.filter((entry) => !entry.allReferencesFound);
+  console.log(`Reviewed traceability: ${references.length} requirements, ${missing.length} with missing references; execution not verified.`);
+  if (missing.length) process.exitCode = 1;
+  return output;
+}
+
+function runScenarioProposals() {
+  ensureDir(reportsDir);
+  const proposals = proposeReviewedScenarios();
+  const output = {
+    generatedAt: new Date().toISOString(),
+    note: "Deterministic suggestions from manually curated gaps, not model output. Human review is required before implementation.",
+    proposals,
+  };
+  fs.writeFileSync(path.join(reportsDir, "scenario-proposals.json"), JSON.stringify(output, null, 2));
+  console.log(`Generated ${proposals.length} scenario proposals for review; no tests were added.`);
+  return output;
+}
+
+function runPrioritize(args) {
+  try {
+    const result = prioritize(args);
+    console.log(JSON.stringify(result, null, 2));
+    return result;
+  } catch (error) {
+    console.error(`Cannot prioritize: ${error.message}`);
+    process.exitCode = 1;
+    return null;
+  }
 }
 
 async function runExecutiveReport() {
@@ -291,13 +315,33 @@ const [command, ...rest] = process.argv.slice(2);
 
 switch (command) {
   case "analyze-failures":
-    await runAnalyzeFailures();
+    {
+      let resultsPath;
+      let outputName;
+      let offline = false;
+      for (let i = 0; i < rest.length; i++) {
+        if (rest[i] === "--offline") {
+          offline = true;
+        } else if ((rest[i] === "--results" || rest[i] === "--output") && rest[i + 1] && !rest[i + 1].startsWith("--")) {
+          if (rest[i] === "--results") resultsPath = rest[++i]; else outputName = rest[++i];
+        } else {
+          throw new Error("Use --results <Playwright JSON>, --output <JSON filename>, and/or --offline.");
+        }
+      }
+      await runAnalyzeFailures({ resultsPath, outputName, offline });
+    }
     break;
   case "evaluate-ai":
     runEvaluateAi();
     break;
   case "coverage-matrix":
     runCoverageMatrix();
+    break;
+  case "reviewed-traceability":
+    runReviewedTraceability();
+    break;
+  case "scenario-proposals":
+    runScenarioProposals();
     break;
   case "prioritize":
     runPrioritize(rest);
@@ -306,6 +350,6 @@ switch (command) {
     await runExecutiveReport();
     break;
   default:
-    console.error("Usage: node tools/ai-qa/cli.mjs <analyze-failures|evaluate-ai|coverage-matrix|prioritize|executive-report>");
+    console.error("Usage: node tools/ai-qa/cli.mjs <analyze-failures|evaluate-ai|coverage-matrix|reviewed-traceability|scenario-proposals|prioritize|executive-report>");
     process.exit(1);
 }
