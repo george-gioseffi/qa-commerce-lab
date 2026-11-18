@@ -15,7 +15,7 @@ A IA neste repositório **auxilia o trabalho de QA** sem substituir testes deter
 |---|---|---|
 | `npm run ai:analyze` | Lê `tests/e2e/test-results/results.json`, sanitiza falhas e classifica causa raiz | `reports/ai-failure-analysis.json` |
 | `npm run ai:evaluate` | Executa benchmark contra dataset rotulado (`tools/ai-qa/benchmark/known-failures.json`) | `reports/ai-benchmark.json` |
-| `npm run ai:matrix` | Cruza requisitos de negócio com os casos de teste reais do repositório | `reports/traceability-matrix.json` |
+| `npm run ai:matrix` | Procura candidatos por palavras nos títulos de testes; exige revisão humana | `reports/traceability-matrix.json` |
 | `npm run ai:prioritize` | Mapeia arquivos alterados no `git diff` para sugerir ordem de execução de suítes | stdout JSON |
 | `npm run ai:report` | Consolida métricas reais de Playwright, matriz e benchmark em relatório executivo | `reports/executive-summary.md` e `.json` |
 | `npm run test:ai` | Testes unitários do sanitizador e classificador | stdout TAP/node:test |
@@ -24,4 +24,5 @@ A IA neste repositório **auxilia o trabalho de QA** sem substituir testes deter
 
 - O classificador determinístico baseia-se em assinaturas de erro conhecidas; falhas inéditas são marcadas como `UNCLASSIFIED` com confiança `low` para triagem humana.
 - O adaptador externo recebe somente sinais resumidos, o que reduz o contexto disponível para o diagnóstico. A configuração de um provedor real deve ser testada separadamente; o benchmark atual avalia apenas o classificador determinístico.
+- A matriz busca palavras nos títulos em uma lista específica de arquivos. Correspondências podem ser incorretas ou incompletas e não comprovam que um requisito esteja coberto ou que um teste tenha sido executado.
 - A priorização de PR sugere ordem de feedback rápido, mas o pipeline completo de CI continua obrigatório antes do merge.

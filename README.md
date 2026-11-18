@@ -1,6 +1,6 @@
 # QA Commerce Lab
 
-> **English Summary (for International Recruiters):** QA Commerce Lab is a full-stack e-commerce test automation portfolio (Node.js, TypeScript, Express, Prisma, PostgreSQL, React, Vite) featuring a complete testing pyramid: Vitest unit & Supertest API integration tests (including concurrency/race-condition protection), Playwright E2E with isolated per-test user fixtures, `axe-core` accessibility audits, k6 load testing, GitHub Actions CI quality gates, and an offline-capable **AI-Assisted Quality Engineering** module (`tools/ai-qa`) with log sanitization, failure classification, benchmark evaluation, and traceability matrix generation.
+> **English Summary (for International Recruiters):** QA Commerce Lab is a full-stack e-commerce test automation portfolio (Node.js, TypeScript, Express, Prisma, PostgreSQL, React, Vite) featuring Vitest unit and Supertest API integration tests, Playwright E2E with isolated per-test user fixtures, `axe-core` accessibility audits, k6 load testing, GitHub Actions CI quality gates, and an offline-capable **AI-Assisted Quality Engineering** module (`tools/ai-qa`) with log sanitization, failure classification, benchmark evaluation, and candidate traceability mappings requiring human review.
 
 ## Visão geral
 

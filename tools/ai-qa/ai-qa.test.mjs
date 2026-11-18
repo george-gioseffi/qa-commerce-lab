@@ -1,7 +1,23 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { analyzeFailure, classifyFailureDeterministic, FAILURE_CATEGORIES } from "./classifier.mjs";
 import { sanitizeText } from "./sanitizer.mjs";
+
+test("traceability keyword matches do not assert coverage", () => {
+  const cli = fileURLToPath(new URL("./cli.mjs", import.meta.url));
+  const report = fileURLToPath(new URL("../../reports/traceability-matrix.json", import.meta.url));
+  execFileSync(process.execPath, [cli, "coverage-matrix"]);
+  const result = JSON.parse(fs.readFileSync(report, "utf8"));
+  assert.ok(result.matrix.length > 0);
+  assert.match(result.method, /manual review/i);
+  for (const area of result.matrix) {
+    assert.equal(area.covered, null);
+    assert.equal(area.reviewRequired, true);
+  }
+});
 
 test("sanitizeText redacts JWTs, DB passwords, and API keys", () => {
   const raw =

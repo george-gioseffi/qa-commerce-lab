@@ -188,7 +188,8 @@ function runCoverageMatrix() {
     return {
       requirementId: req.id,
       area: req.area,
-      covered: matchedTests.length > 0,
+      covered: null,
+      reviewRequired: true,
       testCount: matchedTests.length,
       matchedTests,
     };
@@ -196,13 +197,14 @@ function runCoverageMatrix() {
 
   const output = {
     generatedAt: new Date().toISOString(),
+    method: "Keyword matches in test titles are candidates only; manual review is required to establish coverage.",
     totalTestFilesScanned: indexed.length,
     totalTestCasesFound: indexed.reduce((sum, f) => sum + f.tests.length, 0),
     matrix,
   };
 
   fs.writeFileSync(path.join(reportsDir, "traceability-matrix.json"), JSON.stringify(output, null, 2));
-  console.log(`Traceability matrix: ${output.totalTestCasesFound} test cases mapped across ${matrix.length} requirements.`);
+  console.log(`Traceability candidates: ${output.totalTestCasesFound} test titles scanned for ${matrix.length} requirement areas; review required.`);
   return output;
 }
 
@@ -279,7 +281,7 @@ async function runExecutiveReport() {
     pwStats.observed
       ? `- **Playwright E2E**: ${pwStats.expected} passed, ${pwStats.unexpected} failed, ${pwStats.skipped} skipped (${pwStats.durationMs}ms)`
       : "- **Playwright E2E**: Not executed yet (`tests/e2e/test-results/results.json` not found)",
-    `- **Traceability Matrix**: ${matrix.totalTestCasesFound} automated test cases mapped across ${matrix.matrix.length} requirement areas`,
+    `- **Traceability candidates**: ${matrix.totalTestCasesFound} test titles scanned for ${matrix.matrix.length} requirement areas; keyword matches require manual review and do not prove coverage.`,
     `- **AI Failure Classifier Benchmark**: ${(benchmark.accuracy * 100).toFixed(1)}% accuracy (${benchmark.correct}/${benchmark.totalSamples} known failures)`,
     "",
     "## Evidence Artifacts",
