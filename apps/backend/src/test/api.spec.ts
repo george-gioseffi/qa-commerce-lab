@@ -1,5 +1,10 @@
+import fs from "node:fs";
+import path from "node:path";
+import Ajv from "ajv";
+import addFormats from "ajv-formats";
 import jwt from "jsonwebtoken";
 import request from "supertest";
+import { parse as parseYaml } from "yaml";
 import { beforeAll, describe, expect, it } from "vitest";
 import { app } from "../app.js";
 import { env } from "../config/env.js";
@@ -484,6 +489,163 @@ describe("API contract and integration coverage", () => {
           where: { productId: dockProduct.id },
         });
       }
+    });
+  });
+
+  describe("Security, Inactive Products & OpenAPI Contract", () => {
+    it("ignores role escalation on register and never exposes passwordHash", async () => {
+      const email = `sec.${Date.now()}@example.com`;
+      const regRes = await request(app).post("/api/auth/register").send({
+        name: "Privilege Test",
+        email,
+        password: "Password123!",
+        role: "ADMIN",
+      });
+
+      expect(regRes.status).toBe(201);
+      expect(regRes.body.user.role).toBe("CUSTOMER");
+      expect(regRes.body.user.passwordHash).toBeUndefined();
+
+      const meRes = await request(app)
+        .get("/api/auth/me")
+        .set("Authorization", `Bearer ${regRes.body.token}`);
+      expect(meRes.status).toBe(200);
+      expect(meRes.body.role).toBe("CUSTOMER");
+      expect(meRes.body.passwordHash).toBeUndefined();
+
+      await prisma.user.deleteMany({ where: { email } });
+    });
+
+    it("hides inactive products from catalog, detail, and cart additions", async () => {
+      const inactive = await prisma.product.create({
+        data: {
+          name: `Inactive ${Date.now()}`,
+          description: "Synthetic inactive product",
+          category: "Test",
+          priceInCents: 1990,
+          stock: 5,
+          isActive: false,
+          imageUrl: "https://example.invalid/inactive.png",
+        },
+      });
+
+      try {
+        const listRes = await request(app).get("/api/products");
+        expect(listRes.status).toBe(200);
+        expect(listRes.body.some((p: { id: string }) => p.id === inactive.id)).toBe(false);
+
+        const detailRes = await request(app).get(`/api/products/${inactive.id}`);
+        expect(detailRes.status).toBe(404);
+
+        const addRes = await request(app)
+          .post("/api/cart/items")
+          .set("Authorization", `Bearer ${customerToken}`)
+          .send({ productId: inactive.id, quantity: 1 });
+        expect(addRes.status).toBe(404);
+      } finally {
+        await prisma.product.delete({ where: { id: inactive.id } });
+      }
+    });
+
+    it("rejects negative and non-integer cart quantities", async () => {
+      const negRes = await request(app)
+        .post("/api/cart/items")
+        .set("Authorization", `Bearer ${customerToken}`)
+        .send({ productId: keyboardProduct.id, quantity: -1 });
+      expect(negRes.status).toBe(400);
+
+      const floatRes = await request(app)
+        .post("/api/cart/items")
+        .set("Authorization", `Bearer ${customerToken}`)
+        .send({ productId: keyboardProduct.id, quantity: 1.5 });
+      expect(floatRes.status).toBe(400);
+    });
+
+    it("validates live API responses against OpenAPI 3.0 schemas in docs/openapi.yaml", async () => {
+      const specPath = path.resolve(process.cwd(), "../../docs/openapi.yaml");
+      const spec = parseYaml(fs.readFileSync(specPath, "utf8")) as {
+        openapi: string;
+        paths: Record<string, Record<string, { responses: Record<string, { content?: { "application/json"?: { schema: Record<string, unknown> } } }> }>>;
+        components: { schemas: Record<string, Record<string, unknown>> };
+      };
+
+      expect(spec.openapi).toBe("3.0.3");
+
+      const ajv = new Ajv.default({ allErrors: true, strict: false });
+      addFormats.default(ajv);
+      for (const [name, schema] of Object.entries(spec.components.schemas)) {
+        ajv.addSchema(schema, `#/components/schemas/${name}`);
+      }
+
+      const assertMatchesOpenApi = (routePath: string, method: string, status: number, body: unknown) => {
+        const responseSpec = spec.paths[routePath]?.[method]?.responses[String(status)];
+        expect(responseSpec, `Missing OpenAPI response ${method.toUpperCase()} ${routePath} ${status}`).toBeDefined();
+        const schema = responseSpec?.content?.["application/json"]?.schema;
+        if (!schema) return;
+        const validate = ajv.compile(schema);
+        const valid = validate(body);
+        expect(valid, `OpenAPI schema mismatch for ${method.toUpperCase()} ${routePath} ${status}: ${ajv.errorsText(validate.errors)}`).toBe(true);
+      };
+
+      const health = await request(app).get("/health");
+      expect(health.status).toBe(200);
+      assertMatchesOpenApi("/health", "get", 200, health.body);
+
+      const shortLogin = await request(app).post("/api/auth/login").send({
+        email: "qa.customer@example.com",
+        password: "1234567",
+      });
+      expect(shortLogin.status).toBe(400);
+      assertMatchesOpenApi("/api/auth/login", "post", 400, shortLogin.body);
+
+      const badEmailRegister = await request(app).post("/api/auth/register").send({
+        name: "Bad Email",
+        email: "user@nodot",
+        password: "Password123!",
+      });
+      expect(badEmailRegister.status).toBe(400);
+      assertMatchesOpenApi("/api/auth/register", "post", 400, badEmailRegister.body);
+
+      const meRes = await request(app).get("/api/auth/me").set("Authorization", `Bearer ${customerToken}`);
+      expect(meRes.status).toBe(200);
+      assertMatchesOpenApi("/api/auth/me", "get", 200, meRes.body);
+
+      const productsRes = await request(app).get("/api/products");
+      expect(productsRes.status).toBe(200);
+      assertMatchesOpenApi("/api/products", "get", 200, productsRes.body);
+
+      const productRes = await request(app).get(`/api/products/${keyboardProduct.id}`);
+      expect(productRes.status).toBe(200);
+      assertMatchesOpenApi("/api/products/{id}", "get", 200, productRes.body);
+
+      const missingProductRes = await request(app).get("/api/products/does-not-exist");
+      expect(missingProductRes.status).toBe(404);
+      assertMatchesOpenApi("/api/products/{id}", "get", 404, missingProductRes.body);
+
+      const addCartRes = await request(app)
+        .post("/api/cart/items")
+        .set("Authorization", `Bearer ${customerToken}`)
+        .send({ productId: keyboardProduct.id, quantity: 1 });
+      expect(addCartRes.status).toBe(201);
+      assertMatchesOpenApi("/api/cart/items", "post", 201, addCartRes.body);
+
+      const getCartRes = await request(app).get("/api/cart").set("Authorization", `Bearer ${customerToken}`);
+      expect(getCartRes.status).toBe(200);
+      assertMatchesOpenApi("/api/cart", "get", 200, getCartRes.body);
+
+      const checkoutRes = await request(app).post("/api/checkout").set("Authorization", `Bearer ${customerToken}`).send();
+      expect(checkoutRes.status).toBe(201);
+      assertMatchesOpenApi("/api/checkout", "post", 201, checkoutRes.body);
+
+      const ordersRes = await request(app).get("/api/orders").set("Authorization", `Bearer ${customerToken}`);
+      expect(ordersRes.status).toBe(200);
+      assertMatchesOpenApi("/api/orders", "get", 200, ordersRes.body);
+
+      // Restore stock so repeated runs remain deterministic
+      await prisma.product.update({
+        where: { id: keyboardProduct.id },
+        data: { stock: { increment: 1 } },
+      });
     });
   });
 });

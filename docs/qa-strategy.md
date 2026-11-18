@@ -31,3 +31,16 @@ QA Commerce Lab uses a layered strategy so each test type answers a different qu
 ## Reports Matter
 - Coverage and Playwright reports make the repository reviewer-friendly.
 - Failures become easier to triage with traces, screenshots and explicit scenarios.
+
+## Critérios de Bloqueio de Release
+Uma release ou merge para `master` deve ser bloqueada quando ocorrer qualquer uma das condições abaixo:
+- Falha em `lint`, `typecheck`, `build` ou testes unitários (`npm run test`).
+- Falha em testes de API (`npm run test:api:local`), segurança (vazamento de `passwordHash`, escalação de privilégio) ou concorrência no checkout.
+- Falha em qualquer cenário crítico E2E (`@smoke`, `@auth`, `@cart`, `@checkout`) ou violação `critical`/`serious` no `axe-core`.
+- Exposição de segredos, credenciais ou arquivos `.env` no histórico do commit.
+
+## Política de Defeitos
+- **Crítica / Alta**: bloqueia release, exige reprodução determinística, issue vinculada no GitHub e teste de regressão automatizado antes do fechamento.
+- **Média**: deve ser triada com passos de reprodução, evidência (trace/log) e plano de correção no ciclo atual ou próximo.
+- **Baixa**: registrada para melhoria contínua sem bloquear entrega funcional.
+- Nenhum defeito pode ser marcado como corrigido apenas por análise estática ou hipótese de IA: exige nova execução verde do teste de regressão.

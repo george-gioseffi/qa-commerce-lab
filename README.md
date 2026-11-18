@@ -210,6 +210,9 @@ Os arquivos em `docs/` complementam o projeto com visão de qualidade:
 - `risk-analysis.md`: riscos principais, impacto, mitigação e cobertura relacionada
 - `github-audit-2026.md`: auditoria comparativa dos repositórios e diagnóstico estrutural
 - `ai-assisted-qa.md`: arquitetura do módulo de AI-Assisted QA, sanitização e benchmark
+- `openapi.yaml`: contrato HTTP real da API validado na suíte automatizada
+- `automation-and-debugging.md`: padrões obrigatórios de automação e guia de depuração
+- `playwright-mcp.md`: fluxo de exploração supervisionada com `@playwright/mcp`
 - `visual-e-carga.md`: baseline visual Windows e medições locais de carga com limitações
 - `rastreabilidade.md`: requisitos revisados, referências aos testes e lacunas conhecidas
 - `demonstracao.md`: roteiro reproduzível, incluindo falha controlada com trace
