@@ -2,9 +2,29 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import { fileURLToPath } from "node:url";
+import { summarizeBenchmark } from "./benchmark-summary.mjs";
 import test from "node:test";
 import { analyzeFailure, classifyFailureDeterministic, FAILURE_CATEGORIES } from "./classifier.mjs";
 import { sanitizeText } from "./sanitizer.mjs";
+
+test("benchmark separates wrong labels from abstentions and counts every example", () => {
+  const summary = summarizeBenchmark([
+    { id: "a", expected: "AUTH", predicted: "AUTH" },
+    { id: "b", expected: "AUTH", predicted: "NETWORK" },
+    { id: "c", expected: "AUTH", predicted: "UNCLASSIFIED" },
+    { id: "d", expected: "UNCLASSIFIED", predicted: "UNCLASSIFIED" },
+    { id: "e", expected: "UNCLASSIFIED", predicted: "NETWORK" },
+  ]);
+  assert.equal(summary.totalSamples, 5);
+  assert.equal(summary.correct, 2);
+  assert.equal(summary.accuracy, 0.4);
+  assert.equal(summary.incorrectCount, 3);
+  assert.equal(summary.falsePositiveCount, 2);
+  assert.deepEqual(summary.falsePositives.map(({ id }) => id), ["b", "e"]);
+  assert.equal(summary.unclassifiedCount, 2);
+  assert.equal(summary.missedClassificationCount, 1);
+  assert.equal(summarizeBenchmark([]).accuracy, null);
+});
 
 test("traceability keyword matches do not assert coverage", () => {
   const cli = fileURLToPath(new URL("./cli.mjs", import.meta.url));

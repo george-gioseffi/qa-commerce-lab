@@ -23,6 +23,7 @@ A IA neste repositório **auxilia o trabalho de QA** sem substituir testes deter
 ## Limitações Conhecidas
 
 - O classificador determinístico baseia-se em assinaturas de erro conhecidas; falhas inéditas são marcadas como `UNCLASSIFIED` com confiança `low` para triagem humana.
+- No benchmark, acurácia é o número de rótulos corretos dividido pelo total de exemplos. `falsePositiveCount` conta exemplos com rótulo diferente do esperado e que não são `UNCLASSIFIED`; abstenções são contadas em `unclassifiedCount`, e aquelas em que se esperava uma classe em `missedClassificationCount`. Esses números são contagens por exemplo, não precisão ou recall por classe.
 - O adaptador externo recebe somente sinais resumidos, o que reduz o contexto disponível para o diagnóstico. A configuração de um provedor real deve ser testada separadamente; o benchmark atual avalia apenas o classificador determinístico.
 - A matriz busca palavras nos títulos em uma lista específica de arquivos. Correspondências podem ser incorretas ou incompletas e não comprovam que um requisito esteja coberto ou que um teste tenha sido executado.
 - A priorização de PR sugere ordem de feedback rápido, mas o pipeline completo de CI continua obrigatório antes do merge.

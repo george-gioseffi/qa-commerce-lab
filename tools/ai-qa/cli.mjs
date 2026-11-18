@@ -1,6 +1,7 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { summarizeBenchmark } from "./benchmark-summary.mjs";
 import { analyzeFailure, classifyFailureDeterministic } from "./classifier.mjs";
 import { sanitizeText } from "./sanitizer.mjs";
 
@@ -104,18 +105,11 @@ function runEvaluateAi() {
   const benchmarkPath = path.join(rootDir, "tools/ai-qa/benchmark/known-failures.json");
   const dataset = JSON.parse(fs.readFileSync(benchmarkPath, "utf8"));
 
-  let correct = 0;
-  let unclassified = 0;
-  const falsePositives = [];
   const results = [];
 
   for (const sample of dataset) {
     const prediction = classifyFailureDeterministic(sample);
     const isCorrect = prediction.category === sample.expectedCategory;
-    if (isCorrect) correct += 1;
-    else falsePositives.push({ id: sample.id, expected: sample.expectedCategory, predicted: prediction.category });
-    if (prediction.category === "UNCLASSIFIED") unclassified += 1;
-
     results.push({
       id: sample.id,
       expected: sample.expectedCategory,
@@ -127,18 +121,12 @@ function runEvaluateAi() {
 
   const summary = {
     generatedAt: new Date().toISOString(),
-    totalSamples: dataset.length,
-    correct,
-    accuracy: Number((correct / dataset.length).toFixed(4)),
-    falsePositiveCount: falsePositives.length,
-    unclassifiedCount: unclassified,
-    falsePositives,
-    results,
+    ...summarizeBenchmark(results),
   };
 
   fs.writeFileSync(path.join(reportsDir, "ai-benchmark.json"), JSON.stringify(summary, null, 2));
   console.log(
-    `AI Benchmark: ${correct}/${dataset.length} correct (accuracy ${(summary.accuracy * 100).toFixed(1)}%), unclassified=${unclassified}`
+    `AI Benchmark: ${summary.correct}/${summary.totalSamples} correct (accuracy ${summary.accuracy === null ? "n/a" : `${(summary.accuracy * 100).toFixed(1)}%`}), unclassified=${summary.unclassifiedCount}`
   );
   return summary;
 }
@@ -282,7 +270,7 @@ async function runExecutiveReport() {
       ? `- **Playwright E2E**: ${pwStats.expected} passed, ${pwStats.unexpected} failed, ${pwStats.skipped} skipped (${pwStats.durationMs}ms)`
       : "- **Playwright E2E**: Not executed yet (`tests/e2e/test-results/results.json` not found)",
     `- **Traceability candidates**: ${matrix.totalTestCasesFound} test titles scanned for ${matrix.matrix.length} requirement areas; keyword matches require manual review and do not prove coverage.`,
-    `- **AI Failure Classifier Benchmark**: ${(benchmark.accuracy * 100).toFixed(1)}% accuracy (${benchmark.correct}/${benchmark.totalSamples} known failures)`,
+    `- **AI Failure Classifier Benchmark**: ${benchmark.accuracy === null ? "n/a" : `${(benchmark.accuracy * 100).toFixed(1)}%`} accuracy (${benchmark.correct}/${benchmark.totalSamples} known failures)`,
     "",
     "## Evidence Artifacts",
     "",
