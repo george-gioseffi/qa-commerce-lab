@@ -28,4 +28,4 @@ O checkout usa uma transação serializável e converte conflitos de serializaç
 
 O commit `4aa5f1c` contém a correção e o teste. Os artefatos da execução do workflow ficam disponíveis na [execução do GitHub Actions](https://github.com/george-gioseffi/qa-commerce-lab/actions/runs/44307461733); a disponibilidade dos artefatos está sujeita à retenção do GitHub.
 
-O teste cobre essa sequência específica; ele não comprova ausência de todas as condições de corrida possíveis. Este registro é mantido no repositório e ainda não corresponde a uma issue separada no GitHub.
+O teste cobre essa sequência específica; ele não comprova ausência de todas as condições de corrida possíveis. O defeito também está registrado na [issue #2](https://github.com/george-gioseffi/qa-commerce-lab/issues/2), que permanece aberta enquanto o PR está em revisão.
