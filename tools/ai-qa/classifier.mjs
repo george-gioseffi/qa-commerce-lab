@@ -1,4 +1,5 @@
 import { sanitizeText } from "./sanitizer.mjs";
+import { queryFreeOpenCode } from "./opencode-free.mjs";
 
 export const FAILURE_CATEGORIES = {
   SELECTOR_DRIFT: "SELECTOR_DRIFT",
@@ -120,6 +121,20 @@ export function classifyFailureDeterministic(failure) {
  */
 export async function analyzeFailure(failure) {
   const baseAnalysis = classifyFailureDeterministic(failure);
+  // Explicit opt-in: only a fixed category/confidence pair is sent to OpenCode.
+  // Free-model quota exhaustion or any other error stays offline; no paid fallback.
+  if (process.env.AI_QA_OPENCODE_FREE === "1") {
+    const result = await queryFreeOpenCode({
+      category: baseAnalysis.category,
+      confidence: baseAnalysis.confidence,
+      executable: process.env.AI_QA_OPENCODE_BIN || "opencode",
+    });
+    return result ? {
+      ...baseAnalysis,
+      hypothesis: sanitizeText(result.suggestion),
+      adapter: "opencode-free-with-deterministic-fallback",
+    } : baseAnalysis;
+  }
   const apiKey = process.env.AI_QA_API_KEY;
   const endpoint = process.env.AI_QA_ENDPOINT;
 

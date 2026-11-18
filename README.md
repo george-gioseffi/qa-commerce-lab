@@ -181,7 +181,9 @@ O workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) é acionado em `
 ## Escopo honesto e limitações conhecidas
 
 - **Contrato OpenAPI:** a validação com `Ajv` na suíte de API cobre respostas representativas (`200`/`201`/`400`/`404`) dos fluxos principais; não valida todas as permutações de erro (`401`/`409` ou `PATCH`/`DELETE` via Ajv) nem usa middleware OpenAPI completo.
-- **AI-Assisted QA:** executado em modo determinístico offline (`deterministic-heuristic-v1`). O adaptador opcional para LLM externa (`AI_QA_API_KEY` + `AI_QA_ENDPOINT`) é desacoplado e não foi exercitado contra um provedor externo pago/online neste ambiente.
+- **AI-Assisted QA:** executado por padrão em modo determinístico offline (`deterministic-heuristic-v1`). Há dois adaptadores opcionais desacoplados em `tools/ai-qa/`:
+  - `tools/ai-qa/classifier.mjs` (`AI_QA_API_KEY` + `AI_QA_ENDPOINT`): não exercitado contra provedor externo neste ambiente.
+  - `tools/ai-qa/opencode-free.mjs` (`AI_QA_OPENCODE_FREE=1`, `AI_QA_OPENCODE_BIN` opcional): envia apenas rótulos fixos de categoria e confiança (`--standalone --agent summary`, política `deny` para ferramentas em diretório temporário, modelo fixo `opencode/deepseek-v4.1-flash-free`, saída limitada, timeout e fallback determinístico offline sem fallback pago). Validado em testes unitários com mocks (`15/15` em `npm run test:ai`); em teste real na VPS após chamada gratuita anterior, atingiu limite `429` e caiu no fallback offline (sem resposta real bem-sucedida pelo novo adaptador nem garantia de gratuidade futura pelo provedor).
 - **Testes Visuais:** baseline restrita ao cabeçalho em Chromium no Windows (ignorada no job Linux do CI).
 - **Testes de Carga (k6):** executados em ensaio local de leitura (fora do pipeline de CI).
 

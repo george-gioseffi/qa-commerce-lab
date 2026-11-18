@@ -183,7 +183,9 @@ All detailed QA documentation lives in `docs/` (written in Portuguese):
 ## Honest Scope and Known Limitations
 
 - **OpenAPI Contract:** `Ajv` validation in the API suite covers representative `200`/`201`/`400`/`404` responses for core flows; it does not validate every error permutation (`401`/`409` or `PATCH`/`DELETE` via Ajv) or use full OpenAPI request/response middleware.
-- **AI-Assisted QA:** executed in deterministic offline mode (`deterministic-heuristic-v1`). The optional external LLM adapter (`AI_QA_API_KEY` + `AI_QA_ENDPOINT`) is decoupled and was not exercised against a live/paid external provider in this environment.
+- **AI-Assisted QA:** runs by default in deterministic offline mode (`deterministic-heuristic-v1`). Two optional decoupled adapters exist in `tools/ai-qa/`:
+  - `tools/ai-qa/classifier.mjs` (`AI_QA_API_KEY` + `AI_QA_ENDPOINT`): not exercised against a live external provider in this environment.
+  - `tools/ai-qa/opencode-free.mjs` (`AI_QA_OPENCODE_FREE=1`, optional `AI_QA_OPENCODE_BIN`): sends only fixed category/confidence labels (`--standalone --agent summary`, hard-deny tool policy in a temporary directory, pinned `opencode/deepseek-v4.1-flash-free` model, bounded output, timeout, and offline deterministic fallback with no paid fallback). Verified via unit tests with mocks (`15/15` in `npm run test:ai`); in a live VPS check after an earlier free CLI call, it hit rate limit `429` and fell back to offline mode (no successful live response through the new adapter, and no guarantee of future free availability from the provider).
 - **Visual Regression:** baseline covers the header in Windows Chromium only (skipped in the Linux CI job).
 - **Load Testing (k6):** executed as a local read-only demonstration (outside the CI pipeline).
 
