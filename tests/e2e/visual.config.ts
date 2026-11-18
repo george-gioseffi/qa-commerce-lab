@@ -1,0 +1,16 @@
+import { defineConfig, devices } from "@playwright/test";
+
+export default defineConfig({
+  testDir: "./tests",
+  testMatch: "**/visual.spec.ts",
+  workers: 1,
+  reporter: [["list"], ["html", { outputFolder: "visual-report", open: "never" }]],
+  use: { baseURL: "http://127.0.0.1:4173", trace: "retain-on-failure", screenshot: "only-on-failure" },
+  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  webServer: {
+    command: "npm run dev:frontend",
+    port: 4173,
+    reuseExistingServer: false,
+    cwd: "../../",
+  },
+});

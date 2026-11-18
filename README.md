@@ -208,6 +208,7 @@ Os arquivos em `docs/` complementam o projeto com visão de qualidade:
 - `risk-analysis.md`: riscos principais, impacto, mitigação e cobertura relacionada
 - `github-audit-2026.md`: auditoria comparativa dos repositórios e diagnóstico estrutural
 - `ai-assisted-qa.md`: arquitetura do módulo de AI-Assisted QA, sanitização e benchmark
+- `visual-e-carga.md`: baseline visual Windows e medições locais de carga com limitações
 
 ## Solução de problemas
 

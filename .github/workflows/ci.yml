@@ -138,3 +138,29 @@ jobs:
             tests/e2e/playwright-report
             tests/e2e/test-results
             reports
+
+  visual-windows:
+    name: Visual regression (Windows Chromium)
+    needs: quality-gate
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Install Chromium
+        run: npx playwright install chromium
+      - name: Compare reviewed visual baseline
+        run: npm run test:visual --workspace @qa-commerce-lab/e2e
+      - name: Upload visual report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-windows
+          path: |
+            tests/e2e/visual-report
+            tests/e2e/test-results
