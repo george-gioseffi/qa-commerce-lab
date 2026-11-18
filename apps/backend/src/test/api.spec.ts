@@ -343,6 +343,67 @@ describe("API contract and integration coverage", () => {
       }
     });
 
+    it("rejects checkout if the cart quantity changes after it was read", async () => {
+      const unique = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      const registered = await request(app).post("/api/auth/register").send({
+        name: "Cart Update Race",
+        email: `cart.update.${unique}@example.com`,
+        password: "Password123!",
+      });
+      expect(registered.status).toBe(201);
+      const token = registered.body.token as string;
+      const product = await prisma.product.findFirstOrThrow({ where: { name: "Noise Cancelling Headset" } });
+      expect(product.stock).toBeGreaterThanOrEqual(2);
+      expect((await request(app).post("/api/cart/items")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ productId: product.id, quantity: 1 })).status).toBe(201);
+
+      // A statement trigger plus an advisory lock creates a real PostgreSQL barrier:
+      // checkout reads quantity 1, waits before DELETE, and PATCH commits quantity 2.
+      // This runs only against the disposable test database.
+      const lockKey = 781230019;
+      await prisma.$executeRawUnsafe(`CREATE FUNCTION qa_checkout_barrier() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN PERFORM pg_advisory_xact_lock(${lockKey}); RETURN NULL; END; $$`);
+      await prisma.$executeRawUnsafe(`CREATE TRIGGER qa_checkout_barrier_trigger BEFORE DELETE ON "CartItem"
+        FOR EACH STATEMENT EXECUTE FUNCTION qa_checkout_barrier()`);
+      let checkout: Promise<request.Response> | undefined;
+      try {
+        await prisma.$transaction(async (barrier) => {
+          await barrier.$executeRaw`SELECT pg_advisory_xact_lock(${lockKey})`;
+          checkout = request(app).post("/api/checkout")
+            .set("Authorization", `Bearer ${token}`).then((result) => result);
+
+          let reachedBarrier = false;
+          for (let attempt = 0; attempt < 100; attempt++) {
+            const rows = await barrier.$queryRaw<Array<{ blocked: boolean }>>`
+              SELECT EXISTS (SELECT 1 FROM pg_locks
+                WHERE locktype = 'advisory' AND NOT granted) AS blocked`;
+            if (rows[0]?.blocked) {
+              reachedBarrier = true;
+              break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          expect(reachedBarrier).toBe(true);
+          const updated = await request(app).patch(`/api/cart/items/${product.id}`)
+            .set("Authorization", `Bearer ${token}`).send({ quantity: 2 });
+          expect(updated.status).toBe(200);
+        }, { timeout: 15000 });
+
+        const result = await checkout;
+        expect(result?.status).toBe(409);
+        const orders = await request(app).get("/api/orders").set("Authorization", `Bearer ${token}`);
+        expect(orders.body).toHaveLength(0);
+        const cart = await request(app).get("/api/cart").set("Authorization", `Bearer ${token}`);
+        expect(cart.body).toHaveLength(1);
+        expect(cart.body[0].quantity).toBe(2);
+      } finally {
+        await prisma.$executeRawUnsafe('DROP TRIGGER IF EXISTS qa_checkout_barrier_trigger ON "CartItem"');
+        await prisma.$executeRawUnsafe("DROP FUNCTION IF EXISTS qa_checkout_barrier()");
+        await prisma.product.update({ where: { id: product.id }, data: { stock: product.stock } });
+      }
+    }, 20000);
+
     it("prevents overselling when stock drops before checkout", async () => {
       const dockProduct = await prisma.product.findFirstOrThrow({
         where: { name: "USB-C Dock" },

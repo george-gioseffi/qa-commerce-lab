@@ -143,6 +143,25 @@ npm run ai:report
 npm run test:all
 ```
 
+Os comandos locais de testes de API e E2E recriam a massa do banco de testes.
+Use um PostgreSQL descartável no próprio computador, com nome terminado em
+`_test`, e confirme explicitamente o nome antes de executá-los. Por exemplo,
+no PowerShell, para o banco do exemplo em `.env.test.example`:
+
+```powershell
+$env:TEST_DATABASE_URL = "postgresql://postgres:postgres@127.0.0.1:55432/qa_commerce_lab_test?schema=public"
+$env:QA_CONFIRM_TEST_DB = "qa_commerce_lab_test"
+npm run test:api
+npm run test:e2e
+```
+
+No Bash, use `export TEST_DATABASE_URL='...'` e
+`export QA_CONFIRM_TEST_DB=qa_commerce_lab_test`. A suíte `test:api:local`
+também requer `DATABASE_URL` apontando para o mesmo banco de teste. O seed
+normal é idempotente e não limpa o banco. O reset explícito exige confirmação;
+os testes Docker criam um projeto Compose isolado por execução e removem
+somente recursos desse projeto.
+
 ## Validação do zero
 
 ```bash

@@ -1,10 +1,12 @@
 import {
   canReachPort,
+  assertSafeTestDb,
   DEFAULT_TEST_DATABASE_URL,
   dockerAvailable,
   parseDatabaseHostPort,
   run,
 } from "./shared.mjs";
+import { isolatedComposeArgs } from "./compose-isolation.mjs";
 
 const useDocker = process.argv.includes("--docker");
 
@@ -17,13 +19,15 @@ if (useDocker) {
     process.exit(1);
   }
 
+  const compose = isolatedComposeArgs("docker-compose.yml");
   try {
-    run("docker", ["compose", "up", "--build", "-d"]);
-    run("docker", ["compose", "--profile", "e2e", "run", "--rm", "e2e"]);
+    run("docker", [...compose, "up", "--build", "-d"]);
+    run("docker", [...compose, "--profile", "e2e", "run", "--rm", "e2e"]);
   } finally {
-    run("docker", ["compose", "--profile", "e2e", "down", "-v"]);
+    run("docker", [...compose, "--profile", "e2e", "down", "-v"]);
   }
 } else {
+  assertSafeTestDb(testDatabaseUrl, process.env.QA_CONFIRM_TEST_DB);
   const databaseReady = await canReachPort(dbHost, dbPort, 500);
   if (!databaseReady) {
     console.error(

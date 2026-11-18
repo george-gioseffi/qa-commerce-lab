@@ -1,19 +1,22 @@
 import bcrypt from "bcryptjs";
 import { PrismaClient, Role } from "@prisma/client";
+import { validateTestReset } from "./seed-policy.js";
 
 const prisma = new PrismaClient();
 
 async function main() {
-  await prisma.orderItem.deleteMany();
-  await prisma.order.deleteMany();
-  await prisma.cartItem.deleteMany();
-  await prisma.product.deleteMany();
-  await prisma.user.deleteMany();
+  if (process.argv.includes("--reset-test")) {
+    validateTestReset(process.env.DATABASE_URL, process.env.QA_CONFIRM_TEST_DB);
+    await prisma.orderItem.deleteMany();
+    await prisma.order.deleteMany();
+    await prisma.cartItem.deleteMany();
+    await prisma.product.deleteMany();
+    await prisma.user.deleteMany();
+  }
 
   const passwordHash = await bcrypt.hash("Password123!", 10);
 
-  await prisma.user.createMany({
-    data: [
+  const users = [
       {
         name: "QA Customer",
         email: "qa.customer@example.com",
@@ -26,11 +29,12 @@ async function main() {
         passwordHash,
         role: Role.ADMIN,
       },
-    ],
-  });
+    ];
+  for (const user of users) {
+    await prisma.user.upsert({ where: { email: user.email }, create: user, update: {} });
+  }
 
-  await prisma.product.createMany({
-    data: [
+  const products = [
       {
         name: "Mechanical Keyboard",
         description: "RGB keyboard with hot-swappable switches.",
@@ -67,8 +71,12 @@ async function main() {
         isActive: true,
         imageUrl: "https://images.unsplash.com/photo-1580894908361-967195033215?auto=format&fit=crop&w=1200&q=80",
       }
-    ],
-  });
+    ];
+  for (const product of products) {
+    if (!(await prisma.product.findFirst({ where: { name: product.name } }))) {
+      await prisma.product.create({ data: product });
+    }
+  }
 }
 
 main()

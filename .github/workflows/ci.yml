@@ -50,6 +50,9 @@ jobs:
       - name: Unit tests & Coverage
         run: npm run coverage
 
+      - name: Test database and cleanup safety
+        run: npm run test:safety
+
       - name: AI QA Unit Tests & Benchmark
         run: |
           npm run test:ai
@@ -70,19 +73,21 @@ jobs:
       postgres:
         image: postgres:16
         env:
-          POSTGRES_DB: qa_commerce_lab
+          POSTGRES_DB: qa_commerce_lab_test
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d qa_commerce_lab"
+          --health-cmd "pg_isready -U postgres -d qa_commerce_lab_test"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
 
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/qa_commerce_lab?schema=public
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/qa_commerce_lab_test?schema=public
+      TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/qa_commerce_lab_test?schema=public
+      QA_CONFIRM_TEST_DB: qa_commerce_lab_test
       JWT_SECRET: ci-test-secret-key
       PORT: 3333
       FRONTEND_URL: http://127.0.0.1:4173
@@ -106,13 +111,13 @@ jobs:
         run: npm run db:push
 
       - name: Seed database
-        run: npm run db:seed
+        run: npm run db:test:seed
 
       - name: API tests
         run: npm run test:api:local
 
       - name: Reset isolated CI data for E2E
-        run: npm run db:seed
+        run: npm run db:test:seed
 
       - name: Install Playwright Browsers
         run: npm run install:browsers --workspace @qa-commerce-lab/e2e

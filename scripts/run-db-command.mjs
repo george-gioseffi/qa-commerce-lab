@@ -1,4 +1,4 @@
-import { run } from "./shared.mjs";
+import { assertSafeTestDb, run } from "./shared.mjs";
 
 const command = process.argv[2];
 
@@ -15,6 +15,8 @@ const testEnv = {
   JWT_SECRET: process.env.TEST_JWT_SECRET ?? "super-secret-key",
   FRONTEND_URL: process.env.TEST_FRONTEND_URL ?? "http://127.0.0.1:4173",
 };
+
+assertSafeTestDb(testEnv.DATABASE_URL, testEnv.QA_CONFIRM_TEST_DB);
 
 if (command === "push") {
   run("npm", ["run", "db:push", "--workspace", "@qa-commerce-lab/backend"], { env: testEnv });

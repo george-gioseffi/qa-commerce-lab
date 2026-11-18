@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyFailureDeterministic, FAILURE_CATEGORIES } from "./classifier.mjs";
+import { analyzeFailure, classifyFailureDeterministic, FAILURE_CATEGORIES } from "./classifier.mjs";
 import { sanitizeText } from "./sanitizer.mjs";
 
 test("sanitizeText redacts JWTs, DB passwords, and API keys", () => {
@@ -16,6 +16,59 @@ test("sanitizeText redacts JWTs, DB passwords, and API keys", () => {
   assert.equal(cleaned.includes("[REDACTED_JWT]"), true);
   assert.equal(cleaned.includes("[REDACTED_PASSWORD]"), true);
   assert.equal(cleaned.includes("[REDACTED_KEY]"), true);
+});
+
+test("redacts common credentials in logs and failure metadata", () => {
+  const result = classifyFailureDeterministic({
+    name: "password=name-secret",
+    file: "tests/token=file-secret",
+    error: "Authorization: Bearer opaque-secret\nCookie: session=cookie-secret\npassword=plain-secret",
+    attachments: [{ name: "api_key=attachment-secret", contentType: "text/plain", path: "token=path-secret" }],
+    recentChangedFiles: ["secret=changed-secret"],
+  });
+  const serialized = JSON.stringify(result);
+  for (const secret of ["name-secret", "file-secret", "opaque-secret", "cookie-secret", "plain-secret", "attachment-secret", "path-secret", "changed-secret"]) {
+    assert.equal(serialized.includes(secret), false);
+  }
+});
+
+test("external adapter sends only allowlisted classification fields and rejects insecure endpoints", async () => {
+  const previousFetch = globalThis.fetch;
+  const previousKey = process.env.AI_QA_API_KEY;
+  const previousEndpoint = process.env.AI_QA_ENDPOINT;
+  let captured;
+  try {
+    process.env.AI_QA_API_KEY = "fake-test-key";
+    process.env.AI_QA_ENDPOINT = "https://example.com/analyze";
+    globalThis.fetch = async (url, options) => {
+      captured = { url: String(url), options };
+      return { ok: true, json: async () => ({ hypothesis: "Review authentication." }) };
+    };
+    const result = await analyzeFailure({
+      name: "private-test-title",
+      file: "private-file-path",
+      error: "401 password=private-secret opaque-private-content",
+      attachments: [{ name: "private-attachment-name", path: "private-attachment-path" }],
+      recentChangedFiles: ["private-changed-file"],
+    });
+    assert.equal(result.adapter, "external-llm-with-deterministic-fallback");
+    assert.equal(captured.url, "https://example.com/analyze");
+    assert.equal(captured.options.redirect, "error");
+    const payload = JSON.parse(captured.options.body);
+    assert.deepEqual(Object.keys(payload).sort(), ["max_tokens", "prompt"]);
+    assert.match(payload.prompt, /AUTH_FAILURE/);
+    assert.doesNotMatch(captured.options.body, /private-/);
+
+    captured = undefined;
+    process.env.AI_QA_ENDPOINT = "http://example.com/analyze";
+    const fallback = await analyzeFailure({ error: "401" });
+    assert.equal(fallback.adapter, "deterministic-heuristic-v1");
+    assert.equal(captured, undefined);
+  } finally {
+    globalThis.fetch = previousFetch;
+    if (previousKey === undefined) delete process.env.AI_QA_API_KEY; else process.env.AI_QA_API_KEY = previousKey;
+    if (previousEndpoint === undefined) delete process.env.AI_QA_ENDPOINT; else process.env.AI_QA_ENDPOINT = previousEndpoint;
+  }
 });
 
 test("classifyFailureDeterministic separates evidence from hypothesis and never marks verifiedAfterFix", () => {

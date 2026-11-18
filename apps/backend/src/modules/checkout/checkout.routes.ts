@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Prisma } from "@prisma/client";
 import { prisma } from "../../lib/prisma.js";
 import { requireAuth } from "../../middleware/auth.js";
 import { buildOrderTotal, canCheckout } from "./checkout.logic.js";
@@ -90,7 +91,7 @@ checkoutRouter.post("/", requireAuth, async (request, response) => {
           items: true,
         },
       });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     return response.status(201).json(order);
   } catch (error) {
@@ -99,6 +100,9 @@ checkoutRouter.post("/", requireAuth, async (request, response) => {
     }
     if (error instanceof InsufficientStockError || error instanceof ConcurrentCheckoutError) {
       return response.status(409).json({ message: error.message });
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      return response.status(409).json({ message: "Checkout conflicted with another cart or stock update. Please retry." });
     }
     throw error;
   }

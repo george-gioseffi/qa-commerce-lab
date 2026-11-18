@@ -56,6 +56,17 @@ export function dockerAvailable() {
 export const DEFAULT_TEST_DATABASE_URL =
   "postgresql://postgres:postgres@127.0.0.1:55432/qa_commerce_lab_test?schema=public";
 
+export function assertSafeTestDb(databaseUrl, confirmation) {
+  let parsed;
+  try { parsed = new URL(databaseUrl); } catch { throw new Error("Test database URL is invalid."); }
+  const name = decodeURIComponent(parsed.pathname.slice(1));
+  if (!["postgres:", "postgresql:"].includes(parsed.protocol) ||
+      !["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname) ||
+      !/^[a-zA-Z0-9_]+_test$/.test(name) || confirmation !== name) {
+    throw new Error("Test database refused: use a local *_test database and set QA_CONFIRM_TEST_DB to its exact name.");
+  }
+}
+
 export function parseDatabaseHostPort(databaseUrl) {
   try {
     const parsed = new URL(databaseUrl);

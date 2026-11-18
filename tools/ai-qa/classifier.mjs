@@ -66,19 +66,27 @@ const RULES = [
 export function classifyFailureDeterministic(failure) {
   const sanitizedError = sanitizeText(failure.error || "");
   const sanitizedFile = sanitizeText(failure.file || "");
+  const sanitizedName = sanitizeText(failure.name || "");
+  const attachments = Array.isArray(failure.attachments) ? failure.attachments.map((item) => ({
+    name: sanitizeText(item?.name || ""),
+    contentType: sanitizeText(item?.contentType || ""),
+    path: sanitizeText(item?.path || ""),
+  })) : [];
+  const recentChangedFiles = Array.isArray(failure.recentChangedFiles)
+    ? failure.recentChangedFiles.map((file) => sanitizeText(file)) : [];
 
   for (const rule of RULES) {
     if (rule.patterns.some((regex) => regex.test(sanitizedError))) {
       return {
-        testName: failure.name,
+        testName: sanitizedName,
         file: sanitizedFile,
         durationMs: failure.durationMs ?? 0,
         category: rule.category,
         confidence: rule.confidence,
         evidence: {
           sanitizedError: sanitizedError.slice(0, 600),
-          attachments: failure.attachments ?? [],
-          recentChangedFiles: failure.recentChangedFiles ?? [],
+          attachments,
+          recentChangedFiles,
         },
         hypothesis: rule.hypothesis,
         recommendation: rule.recommendation,
@@ -89,15 +97,15 @@ export function classifyFailureDeterministic(failure) {
   }
 
   return {
-    testName: failure.name,
+    testName: sanitizedName,
     file: sanitizedFile,
     durationMs: failure.durationMs ?? 0,
     category: FAILURE_CATEGORIES.UNCLASSIFIED,
     confidence: "low",
     evidence: {
       sanitizedError: sanitizedError.slice(0, 600),
-      attachments: failure.attachments ?? [],
-      recentChangedFiles: failure.recentChangedFiles ?? [],
+      attachments,
+      recentChangedFiles,
     },
     hypothesis: "No deterministic rule matched this failure signature.",
     recommendation: "Inspect full trace and backend logs manually.",
@@ -119,23 +127,27 @@ export async function analyzeFailure(failure) {
     return baseAnalysis;
   }
 
+  let timer;
   try {
+    const url = new URL(endpoint);
+    if (url.protocol !== "https:" || url.username || url.password) return baseAnalysis;
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
-    const response = await fetch(endpoint, {
+    timer = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(url, {
       method: "POST",
+      redirect: "error",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         max_tokens: 300,
-        prompt: `Classify QA failure: ${baseAnalysis.evidence.sanitizedError}`,
+        // Never send free-form logs, titles, file paths or attachments. Redaction
+        // is best effort and cannot guarantee arbitrary private data is removed.
+        prompt: `Suggest a QA investigation for category ${baseAnalysis.category} with confidence ${baseAnalysis.confidence}.`,
       }),
       signal: controller.signal,
     });
-    clearTimeout(timer);
-
     if (!response.ok) {
       return baseAnalysis;
     }
@@ -148,5 +160,7 @@ export async function analyzeFailure(failure) {
     };
   } catch {
     return baseAnalysis;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
