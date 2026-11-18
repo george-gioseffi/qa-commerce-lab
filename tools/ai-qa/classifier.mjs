@@ -64,6 +64,9 @@ const RULES = [
   },
 ];
 
+// A single optional OpenCode request per process; all other failures stay local.
+let freeOpenCodeAttempted = false;
+
 export function classifyFailureDeterministic(failure) {
   const sanitizedError = sanitizeText(failure.error || "");
   const sanitizedFile = sanitizeText(failure.file || "");
@@ -119,12 +122,14 @@ export function classifyFailureDeterministic(failure) {
  * Optional decoupled LLM adapter. Only used if AI_QA_API_KEY and AI_QA_ENDPOINT are explicitly set.
  * Falls back cleanly to deterministic classification on any error or missing config.
  */
-export async function analyzeFailure(failure) {
+export async function analyzeFailure(failure, { queryOpenCode = queryFreeOpenCode } = {}) {
   const baseAnalysis = classifyFailureDeterministic(failure);
   // Explicit opt-in: only a fixed category/confidence pair is sent to OpenCode.
   // Free-model quota exhaustion or any other error stays offline; no paid fallback.
   if (process.env.AI_QA_OPENCODE_FREE === "1") {
-    const result = await queryFreeOpenCode({
+    if (freeOpenCodeAttempted) return baseAnalysis;
+    freeOpenCodeAttempted = true;
+    const result = await queryOpenCode({
       category: baseAnalysis.category,
       confidence: baseAnalysis.confidence,
       executable: process.env.AI_QA_OPENCODE_BIN || "opencode",

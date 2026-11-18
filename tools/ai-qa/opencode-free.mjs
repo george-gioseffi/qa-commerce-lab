@@ -1,6 +1,5 @@
 import { execFile as nodeExecFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { lstat, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -15,11 +14,48 @@ const CONFIDENCE = new Set(["low", "medium", "high"]);
 const MODEL = "opencode/deepseek-v4.1-flash-free";
 const execFile = promisify(nodeExecFile);
 
-function safeEnvironment(env) {
-  const allowed = ["HOME", "USERPROFILE", "PATH", "PATHEXT", "SYSTEMROOT", "WINDIR",
-    "APPDATA", "LOCALAPPDATA", "TMPDIR", "TMP", "TEMP", "LANG", "LC_ALL", "USER", "LOGNAME",
-    "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"];
-  return Object.fromEntries(allowed.filter((key) => env[key] !== undefined).map((key) => [key, env[key]]));
+function isolatedEnvironment(env, workdir) {
+  const allowed = ["PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "LANG", "LC_ALL"];
+  return {
+    ...Object.fromEntries(allowed.filter((key) => env[key] !== undefined).map((key) => [key, env[key]])),
+    HOME: workdir, USERPROFILE: workdir,
+    XDG_CONFIG_HOME: path.join(workdir, "config"), XDG_DATA_HOME: path.join(workdir, "data"),
+    XDG_CACHE_HOME: path.join(workdir, "cache"), APPDATA: path.join(workdir, "appdata"),
+    LOCALAPPDATA: path.join(workdir, "localappdata"), OPENCODE_DISABLE_CLAUDE_CODE: "1",
+  };
+}
+
+async function absent(candidate) {
+  try { await lstat(candidate); return false; }
+  catch (error) { if (error?.code === "ENOENT") return true; throw error; }
+}
+
+// Broader OpenCode policy can override a project policy. Refuse to run if an
+// ancestor or machine-wide configuration is present rather than guessing.
+export async function noBroaderConfig(workdir) {
+  const machine = process.platform === "win32"
+    ? [path.join(process.env.ProgramData || process.env.PROGRAMDATA || "C:\\ProgramData", "opencode")]
+    : process.platform === "darwin"
+      ? ["/Library/Application Support/opencode", "/Library/Managed Preferences/ai.opencode.managed.plist"]
+      : ["/etc/opencode"];
+  for (const item of machine) if (!await absent(item)) return false;
+  let parent = path.dirname(workdir);
+  for (;;) {
+    for (const rel of ["opencode.json", "opencode.jsonc", ".opencode", "AGENTS.md", "CLAUDE.md", ".git"]) {
+      if (!await absent(path.join(parent, rel))) return false;
+    }
+    const next = path.dirname(parent);
+    if (next === parent) break;
+    parent = next;
+  }
+  return true;
+}
+
+function supportedVersion(value) {
+  const match = /^(?:opencode v)?(\d+)\.(\d+)\.(\d+)$/.exec(value.trim());
+  if (!match) return false;
+  const [major, minor, patch] = match.slice(1).map(Number);
+  return major === 2 && (minor > 2 || (minor === 2 && patch >= 6));
 }
 
 /**
@@ -31,16 +67,31 @@ function safeEnvironment(env) {
 export async function queryFreeOpenCode({ category, confidence, executable = "opencode" }, run = execFile) {
   if (!CATEGORIES.has(category) || !CONFIDENCE.has(confidence) ||
       typeof executable !== "string" || !executable || executable.includes("\0")) return null;
+  // Windows/macOS temp paths can identify the local account. No external
+  // request is made there until a privacy-preserving location is supported.
+  if (process.platform !== "linux") return null;
   let workdir;
   try {
-    workdir = await mkdtemp(path.join(tmpdir(), "qa-opencode-"));
-    const config = { policies: [{ action: "tool.use", resource: "*", effect: "deny" }] };
+    if (await realpath("/tmp") !== "/tmp") return null;
+    workdir = await mkdtemp("/tmp/qa-opencode-");
+    if (!await noBroaderConfig(workdir)) return null;
+    const env = isolatedEnvironment(process.env, workdir);
+    const version = await run(executable, ["--version"], {
+      cwd: workdir, env, timeout: 5_000, maxBuffer: 1024, encoding: "utf8", windowsHide: true,
+    });
+    if (!supportedVersion(version.stdout)) return null;
+    const config = { policies: [
+      ...["tool.use", "mcp.use", "plugin.use", "skill.use", "websearch.use"]
+        .map((action) => ({ action, resource: "*", effect: "deny" })),
+      { action: "provider.use", resource: "*", effect: "deny" },
+      { action: "provider.use", resource: "opencode", effect: "allow" },
+    ] };
     await writeFile(path.join(workdir, "opencode.json"), JSON.stringify(config), { mode: 0o600 });
     const prompt = `Give one short generic QA investigation suggestion for category ${category} and confidence ${confidence}. Do not use tools.`;
     const args = ["--standalone", "run", "--agent", "summary", "--model", MODEL,
       "--archived", "--format", "json", prompt];
     const { stdout } = await run(executable, args, {
-      cwd: workdir, env: safeEnvironment(process.env), timeout: 60_000,
+      cwd: workdir, env, timeout: 60_000,
       maxBuffer: 256 * 1024, encoding: "utf8", windowsHide: true,
     });
     let text = "";
@@ -63,7 +114,7 @@ export async function queryFreeOpenCode({ category, confidence, executable = "op
   } finally {
     if (workdir) {
       const resolved = path.resolve(workdir);
-      const parent = path.resolve(tmpdir());
+      const parent = "/tmp";
       if (path.dirname(resolved) === parent && path.basename(resolved).startsWith("qa-opencode-")) {
         await rm(resolved, { recursive: true, force: true }).catch(() => {});
       }
