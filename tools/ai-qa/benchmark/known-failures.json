@@ -1,0 +1,72 @@
+[
+  {
+    "id": "KF-01",
+    "name": "user logs in with valid credentials",
+    "file": "tests/auth.spec.ts",
+    "error": "Error: expect(received).toBeVisible() - Received: 401 Unauthorized - Invalid credentials",
+    "expectedCategory": "AUTH_FAILURE"
+  },
+  {
+    "id": "KF-02",
+    "name": "checkout blocks overselling",
+    "file": "tests/cart-checkout.spec.ts",
+    "error": "ApiError: 409 Conflict - Insufficient stock for Mechanical Keyboard",
+    "expectedCategory": "STOCK_OR_BUSINESS_CONFLICT"
+  },
+  {
+    "id": "KF-03",
+    "name": "api spec connects to postgres",
+    "file": "apps/backend/src/test/api.spec.ts",
+    "error": "PrismaClientInitializationError: P1001 Can't reach database server at 127.0.0.1:5432 ECONNREFUSED",
+    "expectedCategory": "DB_OR_ENV_ERROR"
+  },
+  {
+    "id": "KF-04",
+    "name": "user clicks checkout button",
+    "file": "tests/smoke.spec.ts",
+    "error": "TimeoutError: locator('getByTestId(\"checkout-btn\")') waiting for locator to be visible",
+    "expectedCategory": "SELECTOR_DRIFT"
+  },
+  {
+    "id": "KF-05",
+    "name": "catalog loads products",
+    "file": "tests/catalog.spec.ts",
+    "error": "Error: 500 Internal Server Error on GET /api/products",
+    "expectedCategory": "NETWORK_OR_API_ERROR"
+  },
+  {
+    "id": "KF-06",
+    "name": "checkout completes in 30s",
+    "file": "tests/cart-checkout.spec.ts",
+    "error": "Test timeout of 30000ms exceeded while waiting for response",
+    "expectedCategory": "TIMEOUT_OR_SYNC"
+  },
+  {
+    "id": "KF-07",
+    "name": "cart total matches item price",
+    "file": "tests/cart-checkout.spec.ts",
+    "error": "Error: expect(locator).toHaveText('$459.90') Received: '$919.80'",
+    "expectedCategory": "ASSERTION_MISMATCH"
+  },
+  {
+    "id": "KF-08",
+    "name": "session expires cleanly",
+    "file": "tests/auth.spec.ts",
+    "error": "Error: Session expired. Please log in again. JWT verification failed",
+    "expectedCategory": "AUTH_FAILURE"
+  },
+  {
+    "id": "KF-09",
+    "name": "search input filters list",
+    "file": "tests/catalog.spec.ts",
+    "error": "Error: strict mode violation: getByRole('textbox') resolved to 2 elements",
+    "expectedCategory": "SELECTOR_DRIFT"
+  },
+  {
+    "id": "KF-10",
+    "name": "empty cart checkout rejected",
+    "file": "tests/cart-checkout.spec.ts",
+    "error": "Error: Cart is empty.",
+    "expectedCategory": "STOCK_OR_BUSINESS_CONFLICT"
+  }
+]

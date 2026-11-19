@@ -1,0 +1,436 @@
+openapi: 3.0.3
+info:
+  title: QA Commerce Lab API
+  version: 1.0.0
+  description: Real HTTP contract for the QA Commerce Lab backend (Express + Prisma + PostgreSQL).
+servers:
+  - url: http://127.0.0.1:3333
+    description: Local development / test server
+paths:
+  /health:
+    get:
+      summary: Health check
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /api/auth/register:
+    post:
+      summary: Register a new customer account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              additionalProperties: false
+              properties:
+                name: { type: string, minLength: 2 }
+                email: { type: string, pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" }
+                password: { type: string, minLength: 8 }
+      responses:
+        "201":
+          description: Account created with JWT token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Invalid registration payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/login:
+    post:
+      summary: Authenticate user and return JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              additionalProperties: false
+              properties:
+                email: { type: string, pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" }
+                password: { type: string, minLength: 8 }
+      responses:
+        "200":
+          description: Authenticated with JWT token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Invalid login payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/auth/me:
+    get:
+      summary: Get current authenticated user profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Missing, invalid, or expired token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/products:
+    get:
+      summary: List active products with optional search and category filters
+      parameters:
+        - in: query
+          name: search
+          schema: { type: string }
+        - in: query
+          name: category
+          schema: { type: string }
+      responses:
+        "200":
+          description: Array of active products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+  /api/products/{id}:
+    get:
+      summary: Get a single active product by ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/cart:
+    get:
+      summary: Get current user's cart items
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of cart items with product details
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CartItem"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/cart/items:
+    post:
+      summary: Add a product to the cart or increment its quantity
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity]
+              additionalProperties: false
+              properties:
+                productId: { type: string, minLength: 1 }
+                quantity: { type: integer, minimum: 1 }
+      responses:
+        "201":
+          description: Cart item created or updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartItem"
+        "400":
+          description: Invalid payload or requested quantity exceeds stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Product not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/cart/items/{productId}:
+    patch:
+      summary: Update quantity of an existing cart item
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: productId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [quantity]
+              additionalProperties: false
+              properties:
+                quantity: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Cart item updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CartItem"
+        "400":
+          description: Invalid payload or requested quantity exceeds stock
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Product or cart item not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      summary: Remove a product from the cart
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: productId
+          required: true
+          schema: { type: string }
+      responses:
+        "204":
+          description: Cart item removed
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Cart item not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/checkout:
+    post:
+      summary: Convert current cart into an order atomically
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Order created, stock decremented, cart cleared
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Cart is empty
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Insufficient stock or concurrent cart conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/orders:
+    get:
+      summary: List orders belonging to the authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Array of orders with items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OrderWithProducts"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status]
+      additionalProperties: false
+      properties:
+        status: { type: string, enum: [ok] }
+    ErrorResponse:
+      type: object
+      required: [message]
+      additionalProperties: false
+      properties:
+        message: { type: string, minLength: 1 }
+    User:
+      type: object
+      required: [id, name, email, role]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 2 }
+        email: { type: string, pattern: "^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$" }
+        role: { type: string, enum: [CUSTOMER, ADMIN] }
+    AuthResponse:
+      type: object
+      required: [token, user]
+      additionalProperties: false
+      properties:
+        token: { type: string, minLength: 1 }
+        user:
+          $ref: "#/components/schemas/User"
+    Product:
+      type: object
+      required: [id, name, description, category, priceInCents, stock, isActive, imageUrl, createdAt, updatedAt]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        category: { type: string, minLength: 1 }
+        priceInCents: { type: integer, minimum: 1 }
+        stock: { type: integer, minimum: 0 }
+        isActive: { type: boolean }
+        imageUrl: { type: string, minLength: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CartItem:
+      type: object
+      required: [id, quantity, createdAt, updatedAt, userId, productId, product]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        quantity: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        userId: { type: string, minLength: 1 }
+        productId: { type: string, minLength: 1 }
+        product:
+          $ref: "#/components/schemas/Product"
+    OrderItem:
+      type: object
+      required: [id, quantity, priceInCents, orderId, productId]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        quantity: { type: integer, minimum: 1 }
+        priceInCents: { type: integer, minimum: 1 }
+        orderId: { type: string, minLength: 1 }
+        productId: { type: string, minLength: 1 }
+    OrderItemWithProduct:
+      type: object
+      required: [id, quantity, priceInCents, orderId, productId, product]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        quantity: { type: integer, minimum: 1 }
+        priceInCents: { type: integer, minimum: 1 }
+        orderId: { type: string, minLength: 1 }
+        productId: { type: string, minLength: 1 }
+        product:
+          $ref: "#/components/schemas/Product"
+    Order:
+      type: object
+      required: [id, totalInCents, createdAt, userId, items]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        totalInCents: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        userId: { type: string, minLength: 1 }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+    OrderWithProducts:
+      type: object
+      required: [id, totalInCents, createdAt, userId, items]
+      additionalProperties: false
+      properties:
+        id: { type: string, minLength: 1 }
+        totalInCents: { type: integer, minimum: 1 }
+        createdAt: { type: string, format: date-time }
+        userId: { type: string, minLength: 1 }
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemWithProduct"

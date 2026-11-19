@@ -1,0 +1,63 @@
+{
+  "name": "qa-commerce-lab",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Portfolio-ready QA automation lab for a fake e-commerce platform.",
+  "workspaces": [
+    "apps/*",
+    "tests/e2e",
+    "tests/load"
+  ],
+  "scripts": {
+    "setup": "npm install && npm run db:generate",
+    "dev": "npm-run-all --parallel dev:backend dev:frontend",
+    "dev:backend": "npm run dev --workspace @qa-commerce-lab/backend",
+    "dev:frontend": "npm run dev --workspace @qa-commerce-lab/frontend",
+    "build": "npm-run-all build:backend build:frontend",
+    "build:backend": "npm run build --workspace @qa-commerce-lab/backend",
+    "build:frontend": "npm run build --workspace @qa-commerce-lab/frontend",
+    "lint": "npm-run-all lint:backend lint:frontend",
+    "lint:backend": "npm run lint --workspace @qa-commerce-lab/backend",
+    "lint:frontend": "npm run lint --workspace @qa-commerce-lab/frontend",
+    "typecheck": "npm-run-all typecheck:backend typecheck:frontend",
+    "typecheck:backend": "npm run typecheck --workspace @qa-commerce-lab/backend",
+    "typecheck:frontend": "npm run typecheck --workspace @qa-commerce-lab/frontend",
+    "test": "npm run test:unit",
+    "test:unit": "npm run test:unit --workspace @qa-commerce-lab/backend",
+    "test:api": "node scripts/run-api-tests.mjs",
+    "test:api:local": "npm run test:api --workspace @qa-commerce-lab/backend",
+    "test:api:docker": "node scripts/run-api-tests.mjs --docker",
+    "test:e2e": "node scripts/run-e2e-tests.mjs",
+    "test:e2e:local": "npm run test --workspace @qa-commerce-lab/e2e",
+    "test:e2e:ui": "npm run test:ui --workspace @qa-commerce-lab/e2e",
+    "test:e2e:report": "npm run report --workspace @qa-commerce-lab/e2e",
+    "test:e2e:docker": "node scripts/run-e2e-tests.mjs --docker",
+    "test:load": "npm run test --workspace @qa-commerce-lab/load",
+    "test:a11y": "npm run test:a11y --workspace @qa-commerce-lab/e2e",
+    "test:all": "npm-run-all lint typecheck build test test:api test:e2e",
+    "coverage": "npm run coverage --workspace @qa-commerce-lab/backend",
+    "db:generate": "npm run db:generate --workspace @qa-commerce-lab/backend",
+    "db:migrate": "npm run db:migrate --workspace @qa-commerce-lab/backend",
+    "db:push": "npm run db:push --workspace @qa-commerce-lab/backend",
+    "db:seed": "npm run db:seed --workspace @qa-commerce-lab/backend",
+    "db:test:push": "node scripts/run-db-command.mjs push",
+    "db:test:seed": "node scripts/run-db-command.mjs seed",
+    "report": "npm run report --workspace @qa-commerce-lab/e2e",
+    "ai:analyze": "node tools/ai-qa/cli.mjs analyze-failures",
+    "ai:evaluate": "node tools/ai-qa/cli.mjs evaluate-ai",
+    "ai:matrix": "node tools/ai-qa/cli.mjs coverage-matrix",
+    "ai:traceability": "node tools/ai-qa/cli.mjs reviewed-traceability",
+    "ai:scenarios": "node tools/ai-qa/cli.mjs scenario-proposals",
+    "ai:prioritize": "node tools/ai-qa/cli.mjs prioritize",
+    "ai:report": "node tools/ai-qa/cli.mjs executive-report",
+    "test:ai": "node --test tools/ai-qa/ai-qa.test.mjs tools/ai-qa/reviewed-traceability.test.mjs tools/ai-qa/opencode-free.test.mjs tools/ai-qa/local-llama.test.mjs",
+    "test:safety": "node --test scripts/safety.test.mjs && tsx --test apps/backend/prisma/seed-policy.test.ts"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5",
+    "wait-on": "^8.0.5"
+  }
+}
