@@ -185,7 +185,7 @@ O workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) é acionado em `
   - `tools/ai-qa/classifier.mjs` (`AI_QA_API_KEY` + `AI_QA_ENDPOINT`): não exercitado contra provedor externo neste ambiente.
   - `tools/ai-qa/opencode-free.mjs` (`AI_QA_OPENCODE_FREE=1`, `AI_QA_OPENCODE_BIN` opcional) é experimental e só tenta uma chamada por processo. O prompt contém apenas rótulos fixos de categoria e confiança; o cliente OpenCode pode acrescentar contexto e metadados próprios. Usa modelo fixo `opencode/deepseek-v4.1-flash-free`, diretório e perfil temporários, políticas de negação para ferramentas, plugins e MCP, timeout e fallback local em caso de erro. Só opera no Linux, com `/tmp` não redirecionado, para não expor caminhos de usuários de outras plataformas; no Windows e macOS permanece local. Exige OpenCode 2.2.6 ou posterior da série 2 e recusa configurações externas potencialmente conflitantes; não é uma sandbox de sistema operacional. O custo informado é verificado após a chamada e as condições do provedor podem mudar. Os testes usam mocks; na VPS o adaptador encontrou limite `429` e usou o fallback, portanto ainda não há resposta real bem-sucedida pela integração.
 - **Testes Visuais:** baseline restrita ao cabeçalho em Chromium no Windows (ignorada no job Linux do CI).
-- **Testes de Carga (k6):** executados em ensaio local de leitura (fora do pipeline de CI).
+- **Testes de Carga (k6):** script curto (`20s`) de fumaça em leitura (`/health` e `/api/products`) executado no CI (`reports/k6-summary.json`) e localmente via `npm run test:load`; não mede capacidade de produção.
 
 ---
 

@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures/auth";
+import { HomePage } from "./pages/home.page";
 
 test.describe("Cart & Checkout Flows @cart @checkout @regression", () => {
   test("blocks adding to cart when unauthenticated", async ({ homePage }) => {
@@ -106,5 +107,37 @@ test.describe("Cart & Checkout Flows @cart @checkout @regression", () => {
     await homePage.updateQuantity("USB-C Dock", 2);
     await expect(homePage.authError).toContainText("Requested quantity exceeds available stock.");
     await expect(homePage.cartTotal).toHaveText("$649.90");
+  });
+
+  test("handles concurrent cart removal across two tabs without silent state corruption", async ({
+    homePage,
+    isolatedUser,
+    context,
+    page,
+  }) => {
+    await homePage.login(isolatedUser.email, isolatedUser.password);
+    await expect(homePage.logoutButton).toBeVisible();
+
+    await homePage.addToCart("USB-C Dock");
+    await expect(page.getByTestId("cart-item-USB-C Dock")).toBeVisible();
+    await expect(homePage.cartTotal).toHaveText("$649.90");
+
+    const secondTab = await context.newPage();
+    const secondHome = new HomePage(secondTab);
+    await secondHome.goto();
+    await expect(secondTab.getByTestId("cart-item-USB-C Dock")).toBeVisible();
+    await expect(secondHome.cartTotal).toHaveText("$649.90");
+
+    await homePage.removeFromCart("USB-C Dock");
+    await expect(page.getByTestId("cart-empty")).toBeVisible();
+
+    await secondHome.updateQuantity("USB-C Dock", 2);
+    await expect(secondHome.authError).toContainText("Cart item not found.");
+    await expect(secondHome.cartTotal).toHaveText("$649.90");
+
+    await secondTab.reload();
+    await expect(secondTab.getByTestId("cart-empty")).toBeVisible();
+    await expect(secondHome.cartTotal).toHaveText("$0.00");
+    await secondTab.close();
   });
 });

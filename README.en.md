@@ -187,7 +187,7 @@ All detailed QA documentation lives in `docs/` (written in Portuguese):
   - `tools/ai-qa/classifier.mjs` (`AI_QA_API_KEY` + `AI_QA_ENDPOINT`): not exercised against a live external provider in this environment.
   - `tools/ai-qa/opencode-free.mjs` (`AI_QA_OPENCODE_FREE=1`, optional `AI_QA_OPENCODE_BIN`) is experimental and makes at most one request per process. Its prompt contains only fixed category/confidence labels; the OpenCode client may add its own context and metadata. It pins `opencode/deepseek-v4.1-flash-free`, uses a temporary directory and profile, denies tools, plugins and MCP through policies, enforces a timeout, and falls back locally on error. It runs only on Linux with a non-redirected `/tmp` to avoid exposing account paths on other systems; Windows and macOS remain offline. It requires OpenCode 2.2.6 or newer within major version 2 and refuses potentially conflicting broader configurations; this is not an operating-system sandbox. Reported cost is checked after the request and provider conditions may change. Tests use mocks; the VPS adapter hit rate limit `429` and used its local fallback, so no successful live response through this integration has yet been verified.
 - **Visual Regression:** baseline covers the header in Windows Chromium only (skipped in the Linux CI job).
-- **Load Testing (k6):** executed as a local read-only demonstration (outside the CI pipeline).
+- **Load Testing (k6):** short (`20s`) read-endpoint smoke check (`/health` and `/api/products`) run in CI (`reports/k6-summary.json`) and locally via `npm run test:load`; it does not measure production capacity.
 
 ---
 
