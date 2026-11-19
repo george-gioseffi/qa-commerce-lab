@@ -184,6 +184,20 @@ O workflow [.github/workflows/ci.yml](.github/workflows/ci.yml) é acionado em `
 - **AI-Assisted QA:** executado por padrão em modo determinístico offline (`deterministic-heuristic-v1`). Há dois adaptadores opcionais desacoplados em `tools/ai-qa/`:
   - `tools/ai-qa/classifier.mjs` (`AI_QA_API_KEY` + `AI_QA_ENDPOINT`): não exercitado contra provedor externo neste ambiente.
   - `tools/ai-qa/opencode-free.mjs` (`AI_QA_OPENCODE_FREE=1`, `AI_QA_OPENCODE_BIN` opcional) é experimental e só tenta uma chamada por processo. O prompt contém apenas rótulos fixos de categoria e confiança; o cliente OpenCode pode acrescentar contexto e metadados próprios. Usa modelo fixo `opencode/deepseek-v4.1-flash-free`, diretório e perfil temporários, políticas de negação para ferramentas, plugins e MCP, timeout e fallback local em caso de erro. Só opera no Linux, com `/tmp` não redirecionado, para não expor caminhos de usuários de outras plataformas; no Windows e macOS permanece local. Exige OpenCode 2.2.6 ou posterior da série 2 e recusa configurações externas potencialmente conflitantes; não é uma sandbox de sistema operacional. O custo informado é verificado após a chamada e as condições do provedor podem mudar. Os testes usam mocks; na VPS o adaptador encontrou limite `429` e usou o fallback, portanto ainda não há resposta real bem-sucedida pela integração.
+  - `tools/ai-qa/local-llama.mjs` permite uma sugestão **local**, sem chamadas de API ou custo por token, usando o `llama-completion` e um modelo GGUF compatível com Qwen2.5 Instruct instalados separadamente no Linux. É opcional e limitado a uma execução por processo, dois núcleos de processamento e 90 segundos; falhas retornam ao classificador determinístico. A máquina precisa de memória e armazenamento para o modelo, e o uso consome recursos da VPS. O prompt contém somente categoria e confiança previamente definidas, sem logs ou credenciais; o executável e o modelo devem vir de fontes confiáveis, pois não há sandbox do sistema operacional. A sugestão deve ser revisada e pode ser imprecisa.
+
+    Exemplo, após instalar o executável e o modelo:
+
+    ```sh
+    export AI_QA_LOCAL_LLAMA=1
+    export AI_QA_LOCAL_LLAMA_BIN=/caminho/absoluto/llama-completion
+    export AI_QA_LOCAL_MODEL=/caminho/absoluto/modelo-qwen2.5-instruct.gguf
+    # Opcional, apenas quando a instalação precisar de bibliotecas fora do sistema:
+    export AI_QA_LOCAL_LIBDIR=/caminho/absoluto/bibliotecas
+    node tools/ai-qa/cli.mjs analyze-failures --results /caminho/absoluto/resultados.json
+    ```
+
+    O relatório identifica a execução como `local-llama-with-deterministic-fallback`; `deterministic-heuristic-v1` significa que a IA não foi usada. Uma falha sintética foi processada de ponta a ponta na VPS com Qwen2.5-1.5B-Instruct Q4_K_M; isso verifica o fluxo, não a precisão geral das sugestões. O teste automatizado não baixa nem executa o modelo.
 - **Testes Visuais:** baseline restrita ao cabeçalho em Chromium no Windows (ignorada no job Linux do CI).
 - **Testes de Carga (k6):** script curto (`20s`) de fumaça em leitura (`/health` e `/api/products`) executado no CI (`reports/k6-summary.json`) e localmente via `npm run test:load`; não mede capacidade de produção.
 

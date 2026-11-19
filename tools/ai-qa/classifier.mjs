@@ -1,5 +1,6 @@
 import { sanitizeText } from "./sanitizer.mjs";
 import { queryFreeOpenCode } from "./opencode-free.mjs";
+import { queryLocalLlama } from "./local-llama.mjs";
 
 export const FAILURE_CATEGORIES = {
   SELECTOR_DRIFT: "SELECTOR_DRIFT",
@@ -66,6 +67,7 @@ const RULES = [
 
 // A single optional OpenCode request per process; all other failures stay local.
 let freeOpenCodeAttempted = false;
+let localLlamaAttempted = false;
 
 export function classifyFailureDeterministic(failure) {
   const sanitizedError = sanitizeText(failure.error || "");
@@ -122,8 +124,21 @@ export function classifyFailureDeterministic(failure) {
  * Optional decoupled LLM adapter. Only used if AI_QA_API_KEY and AI_QA_ENDPOINT are explicitly set.
  * Falls back cleanly to deterministic classification on any error or missing config.
  */
-export async function analyzeFailure(failure, { queryOpenCode = queryFreeOpenCode } = {}) {
+export async function analyzeFailure(failure, { queryOpenCode = queryFreeOpenCode, queryLocal = queryLocalLlama } = {}) {
   const baseAnalysis = classifyFailureDeterministic(failure);
+  if (process.env.AI_QA_LOCAL_LLAMA === "1") {
+    if (localLlamaAttempted) return baseAnalysis;
+    localLlamaAttempted = true;
+    const result = await queryLocal({
+      category: baseAnalysis.category, confidence: baseAnalysis.confidence,
+      executable: process.env.AI_QA_LOCAL_LLAMA_BIN, model: process.env.AI_QA_LOCAL_MODEL,
+      libraryDir: process.env.AI_QA_LOCAL_LIBDIR,
+    });
+    return result ? {
+      ...baseAnalysis, hypothesis: sanitizeText(result.suggestion),
+      adapter: "local-llama-with-deterministic-fallback",
+    } : baseAnalysis;
+  }
   // Explicit opt-in: only a fixed category/confidence pair is sent to OpenCode.
   // Free-model quota exhaustion or any other error stays offline; no paid fallback.
   if (process.env.AI_QA_OPENCODE_FREE === "1") {

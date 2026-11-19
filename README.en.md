@@ -186,6 +186,20 @@ All detailed QA documentation lives in `docs/` (written in Portuguese):
 - **AI-Assisted QA:** runs by default in deterministic offline mode (`deterministic-heuristic-v1`). Two optional decoupled adapters exist in `tools/ai-qa/`:
   - `tools/ai-qa/classifier.mjs` (`AI_QA_API_KEY` + `AI_QA_ENDPOINT`): not exercised against a live external provider in this environment.
   - `tools/ai-qa/opencode-free.mjs` (`AI_QA_OPENCODE_FREE=1`, optional `AI_QA_OPENCODE_BIN`) is experimental and makes at most one request per process. Its prompt contains only fixed category/confidence labels; the OpenCode client may add its own context and metadata. It pins `opencode/deepseek-v4.1-flash-free`, uses a temporary directory and profile, denies tools, plugins and MCP through policies, enforces a timeout, and falls back locally on error. It runs only on Linux with a non-redirected `/tmp` to avoid exposing account paths on other systems; Windows and macOS remain offline. It requires OpenCode 2.2.6 or newer within major version 2 and refuses potentially conflicting broader configurations; this is not an operating-system sandbox. Reported cost is checked after the request and provider conditions may change. Tests use mocks; the VPS adapter hit rate limit `429` and used its local fallback, so no successful live response through this integration has yet been verified.
+  - `tools/ai-qa/local-llama.mjs` provides an optional **local** suggestion without API calls or per-token charges. It requires `llama-completion` and a Qwen2.5 Instruct-compatible GGUF model installed separately on Linux. It makes at most one attempt per process, uses two CPU threads and a 90-second timeout, and falls back to the deterministic classifier on failure. The model needs memory and storage and consumes VPS resources. The prompt contains only fixed category and confidence labels, not logs or credentials. Use trusted executables and models: this is not an OS sandbox. Suggestions can be inaccurate and require review.
+
+    After installing the runtime and model:
+
+    ```sh
+    export AI_QA_LOCAL_LLAMA=1
+    export AI_QA_LOCAL_LLAMA_BIN=/absolute/path/to/llama-completion
+    export AI_QA_LOCAL_MODEL=/absolute/path/to/qwen2.5-instruct-model.gguf
+    # Optional, only if the runtime needs libraries outside the system:
+    export AI_QA_LOCAL_LIBDIR=/absolute/path/to/libraries
+    node tools/ai-qa/cli.mjs analyze-failures --results /absolute/path/to/results.json
+    ```
+
+    The report marks local inference as `local-llama-with-deterministic-fallback`; `deterministic-heuristic-v1` means AI was not used. One synthetic failure was processed end to end on the VPS with Qwen2.5-1.5B-Instruct Q4_K_M. This validates the path, not the general accuracy of suggestions. Automated tests do not download or run the model.
 - **Visual Regression:** baseline covers the header in Windows Chromium only (skipped in the Linux CI job).
 - **Load Testing (k6):** short (`20s`) read-endpoint smoke check (`/health` and `/api/products`) run in CI (`reports/k6-summary.json`) and locally via `npm run test:load`; it does not measure production capacity.
 
