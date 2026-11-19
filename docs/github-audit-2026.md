@@ -1,8 +1,8 @@
-# Auditoria Completa do GitHub — `george-gioseffi` (2026)
+# Comparação de projetos públicos — `george-gioseffi` (2026)
 
 ## Objetivo
 
-Comparar projetos públicos da conta `george-gioseffi` para selecionar e evoluir o projeto principal de portfólio em **QA Automation + AI-Assisted Quality Engineering**. Dados de projetos privados não são publicados neste relatório.
+Comparar os quatro projetos públicos listados abaixo para selecionar e evoluir o projeto principal de portfólio em **QA Automation + AI-Assisted Quality Engineering**. A tabela não representa uma auditoria exaustiva de todos os repositórios da conta; dados de projetos privados não são publicados neste relatório.
 
 ## Matriz Comparativa
 
