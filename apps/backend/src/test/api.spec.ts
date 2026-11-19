@@ -591,6 +591,37 @@ describe("API contract and integration coverage", () => {
       expect(health.status).toBe(200);
       assertMatchesOpenApi("/health", "get", 200, health.body);
 
+      const contractEmail = `contract.${Date.now()}@example.com`;
+      const registerOk = await request(app).post("/api/auth/register").send({
+        name: "Contract User",
+        email: contractEmail,
+        password: "Password123!",
+      });
+      expect(registerOk.status).toBe(201);
+      assertMatchesOpenApi("/api/auth/register", "post", 201, registerOk.body);
+
+      const registerConflict = await request(app).post("/api/auth/register").send({
+        name: "Contract User",
+        email: contractEmail,
+        password: "Password123!",
+      });
+      expect(registerConflict.status).toBe(409);
+      assertMatchesOpenApi("/api/auth/register", "post", 409, registerConflict.body);
+
+      const loginOk = await request(app).post("/api/auth/login").send({
+        email: contractEmail,
+        password: "Password123!",
+      });
+      expect(loginOk.status).toBe(200);
+      assertMatchesOpenApi("/api/auth/login", "post", 200, loginOk.body);
+
+      const loginUnauthorized = await request(app).post("/api/auth/login").send({
+        email: contractEmail,
+        password: "WrongPassword123!",
+      });
+      expect(loginUnauthorized.status).toBe(401);
+      assertMatchesOpenApi("/api/auth/login", "post", 401, loginUnauthorized.body);
+
       const shortLogin = await request(app).post("/api/auth/login").send({
         email: "qa.customer@example.com",
         password: "1234567",
@@ -605,6 +636,10 @@ describe("API contract and integration coverage", () => {
       });
       expect(badEmailRegister.status).toBe(400);
       assertMatchesOpenApi("/api/auth/register", "post", 400, badEmailRegister.body);
+
+      const meUnauthorized = await request(app).get("/api/auth/me");
+      expect(meUnauthorized.status).toBe(401);
+      assertMatchesOpenApi("/api/auth/me", "get", 401, meUnauthorized.body);
 
       const meRes = await request(app).get("/api/auth/me").set("Authorization", `Bearer ${customerToken}`);
       expect(meRes.status).toBe(200);
@@ -622,12 +657,59 @@ describe("API contract and integration coverage", () => {
       expect(missingProductRes.status).toBe(404);
       assertMatchesOpenApi("/api/products/{id}", "get", 404, missingProductRes.body);
 
+      const emptyCheckoutRes = await request(app)
+        .post("/api/checkout")
+        .set("Authorization", `Bearer ${registerOk.body.token}`)
+        .send();
+      expect(emptyCheckoutRes.status).toBe(400);
+      assertMatchesOpenApi("/api/checkout", "post", 400, emptyCheckoutRes.body);
+
       const addCartRes = await request(app)
         .post("/api/cart/items")
         .set("Authorization", `Bearer ${customerToken}`)
         .send({ productId: keyboardProduct.id, quantity: 1 });
       expect(addCartRes.status).toBe(201);
       assertMatchesOpenApi("/api/cart/items", "post", 201, addCartRes.body);
+
+      const patchCartRes = await request(app)
+        .patch(`/api/cart/items/${keyboardProduct.id}`)
+        .set("Authorization", `Bearer ${customerToken}`)
+        .send({ quantity: 2 });
+      expect(patchCartRes.status).toBe(200);
+      assertMatchesOpenApi("/api/cart/items/{productId}", "patch", 200, patchCartRes.body);
+
+      const patchCartInvalidRes = await request(app)
+        .patch(`/api/cart/items/${keyboardProduct.id}`)
+        .set("Authorization", `Bearer ${customerToken}`)
+        .send({ quantity: 0 });
+      expect(patchCartInvalidRes.status).toBe(400);
+      assertMatchesOpenApi("/api/cart/items/{productId}", "patch", 400, patchCartInvalidRes.body);
+
+      const patchCartMissingRes = await request(app)
+        .patch("/api/cart/items/does-not-exist")
+        .set("Authorization", `Bearer ${customerToken}`)
+        .send({ quantity: 1 });
+      expect(patchCartMissingRes.status).toBe(404);
+      assertMatchesOpenApi("/api/cart/items/{productId}", "patch", 404, patchCartMissingRes.body);
+
+      const deleteCartMissingRes = await request(app)
+        .delete("/api/cart/items/does-not-exist")
+        .set("Authorization", `Bearer ${customerToken}`);
+      expect(deleteCartMissingRes.status).toBe(404);
+      assertMatchesOpenApi("/api/cart/items/{productId}", "delete", 404, deleteCartMissingRes.body);
+
+      const deleteCartOkRes = await request(app)
+        .delete(`/api/cart/items/${keyboardProduct.id}`)
+        .set("Authorization", `Bearer ${customerToken}`);
+      expect(deleteCartOkRes.status).toBe(204);
+      assertMatchesOpenApi("/api/cart/items/{productId}", "delete", 204, deleteCartOkRes.body);
+
+      const reAddCartRes = await request(app)
+        .post("/api/cart/items")
+        .set("Authorization", `Bearer ${customerToken}`)
+        .send({ productId: keyboardProduct.id, quantity: 1 });
+      expect(reAddCartRes.status).toBe(201);
+      assertMatchesOpenApi("/api/cart/items", "post", 201, reAddCartRes.body);
 
       const getCartRes = await request(app).get("/api/cart").set("Authorization", `Bearer ${customerToken}`);
       expect(getCartRes.status).toBe(200);
@@ -641,10 +723,23 @@ describe("API contract and integration coverage", () => {
       expect(ordersRes.status).toBe(200);
       assertMatchesOpenApi("/api/orders", "get", 200, ordersRes.body);
 
+      const overStockProduct = await prisma.product.findUniqueOrThrow({ where: { id: keyboardProduct.id } });
+      await request(app)
+        .post("/api/cart/items")
+        .set("Authorization", `Bearer ${registerOk.body.token}`)
+        .send({ productId: keyboardProduct.id, quantity: overStockProduct.stock });
+      await prisma.product.update({ where: { id: keyboardProduct.id }, data: { stock: 0 } });
+      const conflictCheckoutRes = await request(app)
+        .post("/api/checkout")
+        .set("Authorization", `Bearer ${registerOk.body.token}`)
+        .send();
+      expect(conflictCheckoutRes.status).toBe(409);
+      assertMatchesOpenApi("/api/checkout", "post", 409, conflictCheckoutRes.body);
+
       // Restore stock so repeated runs remain deterministic
       await prisma.product.update({
         where: { id: keyboardProduct.id },
-        data: { stock: { increment: 1 } },
+        data: { stock: overStockProduct.stock + 1 },
       });
     });
   });

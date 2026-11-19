@@ -45,3 +45,12 @@ test("scenario proposals contain concrete review fields and never modify the off
     assert.equal(proposal.origin, "deterministic-curated-gap");
   }
 });
+
+test("docs/rastreabilidade.md documents every curated requirement ID", () => {
+  const root = fileURLToPath(new URL("../../", import.meta.url));
+  const doc = fs.readFileSync(path.join(root, "docs", "rastreabilidade.md"), "utf8");
+  const results = buildReviewedTraceability(root);
+  for (const entry of results) {
+    assert.ok(doc.includes(`| ${entry.id} |`), `Missing ${entry.id} in docs/rastreabilidade.md`);
+  }
+});

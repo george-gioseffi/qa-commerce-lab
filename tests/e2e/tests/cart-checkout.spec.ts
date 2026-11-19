@@ -78,4 +78,33 @@ test.describe("Cart & Checkout Flows @cart @checkout @regression", () => {
     await expect(homePage.authError).toContainText("Insufficient stock for USB-C Dock.");
     await expect(page.getByTestId("cart-item-USB-C Dock")).toBeVisible();
   });
+
+  test("shows error and preserves cart total when quantity update fails", async ({
+    homePage,
+    isolatedUser,
+    page,
+  }) => {
+    await homePage.login(isolatedUser.email, isolatedUser.password);
+    await expect(homePage.logoutButton).toBeVisible();
+
+    await homePage.addToCart("USB-C Dock");
+    await expect(page.getByTestId("cart-item-USB-C Dock")).toBeVisible();
+    await expect(homePage.cartTotal).toHaveText("$649.90");
+
+    await page.route("**/api/cart/items/*", async (route) => {
+      if (route.request().method() === "PATCH") {
+        await route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify({ message: "Requested quantity exceeds available stock." }),
+        });
+        return;
+      }
+      await route.continue();
+    });
+
+    await homePage.updateQuantity("USB-C Dock", 2);
+    await expect(homePage.authError).toContainText("Requested quantity exceeds available stock.");
+    await expect(homePage.cartTotal).toHaveText("$649.90");
+  });
 });

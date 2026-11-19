@@ -42,13 +42,14 @@ export const reviewedRequirements = [
     tests: [
       { file: API, title: "validates invalid quantities, missing products, and missing cart items" },
       { file: `${E2E}/cart-checkout.spec.ts`, title: "updates cart total, persists across reload, and removes item" },
+      { file: `${E2E}/cart-checkout.spec.ts`, title: "shows error and preserves cart total when quantity update fails" },
     ],
     gap: {
-      title: "Falha ao atualizar quantidade no carrinho",
-      objective: "Verificar a recuperação visual quando a API falha na atualização.",
-      preconditions: "Usuário sintético autenticado com um item no carrinho.",
-      steps: ["Simular erro da API ao alterar a quantidade.", "Observar mensagem e conteúdo do carrinho."],
-      expected: "O erro fica visível e o estado não é apresentado como salvo sem confirmação.",
+      title: "Concorrência de alteração no carrinho em múltiplas abas",
+      objective: "Verificar o comportamento da interface quando o carrinho é alterado em outra sessão antes da atualização.",
+      preconditions: "Usuário sintético autenticado com um item no carrinho em duas sessões.",
+      steps: ["Alterar ou remover o item na sessão A.", "Tentar atualizar a quantidade na sessão B."],
+      expected: "O erro 404/409 fica visível e o total exibido é sincronizado sem estado enganoso.",
       type: "E2E",
     },
   },
@@ -84,6 +85,38 @@ export const reviewedRequirements = [
       steps: ["Percorrer formulários e mensagens apenas com teclado.", "Repetir os fluxos principais com leitor de tela."],
       expected: "Foco é perceptível, ordem coerente e mensagens são anunciadas de maneira compreensível.",
       type: "manual",
+    },
+  },
+  {
+    id: "CONTRACT-01", requirement: "Respostas reais da API devem respeitar os schemas OpenAPI 3.0 documentados.",
+    risk: "Quebra silenciosa de contrato entre backend, frontend e documentação.", priority: "alta",
+    tests: [
+      { file: API, title: "validates live API responses against OpenAPI 3.0 schemas in docs/openapi.yaml" },
+      { file: API, title: "ignores role escalation on register and never exposes passwordHash" },
+    ],
+    gap: {
+      title: "Validação de requestBody e headers via middleware OpenAPI completo",
+      objective: "Complementar a validação de respostas com Ajv garantindo também conformidade de entrada em runtime.",
+      preconditions: "Especificação docs/openapi.yaml mantida como fonte única.",
+      steps: ["Submeter requisições com campos extras ou tipos inválidos fora dos casos já cobertos.", "Comparar resposta com o contrato."],
+      expected: "Middleware ou validador de contrato rejeita desvios de entrada e saída de forma uniforme.",
+      type: "API",
+    },
+  },
+  {
+    id: "SAFETY-01", requirement: "Scripts de reset e seed destrutivos não podem atingir bancos não descartáveis.",
+    risk: "Perda acidental de dados locais ou remotos fora do ambiente de teste.", priority: "alta",
+    tests: [
+      { file: "scripts/safety.test.mjs", title: "a test reset requires a local test database and exact confirmation" },
+      { file: "apps/backend/prisma/seed-policy.test.ts", title: "seed reset rejects an unconfirmed, non-test or remote target before connecting" },
+    ],
+    gap: {
+      title: "Auditoria periódica de novos scripts de banco no repositório",
+      objective: "Garantir que futuros scripts no package.json reutilizem a mesma trava _test e QA_CONFIRM_TEST_DB.",
+      preconditions: "Alteração no package.json ou em scripts/.",
+      steps: ["Revisar novos scripts que acessem Prisma/PostgreSQL.", "Confirmar bloqueio sem QA_CONFIRM_TEST_DB."],
+      expected: "Nenhum comando destrutivo executa sem alvo local terminado em _test e confirmação explícita.",
+      type: "Unitário/Segurança",
     },
   },
 ];
