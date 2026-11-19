@@ -137,7 +137,7 @@ function runEvaluateAi() {
 
   fs.writeFileSync(path.join(reportsDir, "ai-benchmark.json"), JSON.stringify(summary, null, 2));
   console.log(
-    `AI Benchmark: ${summary.correct}/${summary.totalSamples} correct (accuracy ${summary.accuracy === null ? "n/a" : `${(summary.accuracy * 100).toFixed(1)}%`}), unclassified=${summary.unclassifiedCount}`
+    `Deterministic classifier benchmark: ${summary.correct}/${summary.totalSamples} correct (accuracy ${summary.accuracy === null ? "n/a" : `${(summary.accuracy * 100).toFixed(1)}%`}), unclassified=${summary.unclassifiedCount}`
   );
   return summary;
 }
@@ -294,7 +294,7 @@ async function runExecutiveReport() {
       ? `- **Playwright E2E**: ${pwStats.expected} passed, ${pwStats.unexpected} failed, ${pwStats.skipped} skipped (${pwStats.durationMs}ms)`
       : "- **Playwright E2E**: Not executed yet (`tests/e2e/test-results/results.json` not found)",
     `- **Traceability candidates**: ${matrix.totalTestCasesFound} test titles scanned for ${matrix.matrix.length} requirement areas; keyword matches require manual review and do not prove coverage.`,
-    `- **AI Failure Classifier Benchmark**: ${benchmark.accuracy === null ? "n/a" : `${(benchmark.accuracy * 100).toFixed(1)}%`} accuracy (${benchmark.correct}/${benchmark.totalSamples} known failures)`,
+    `- **Deterministic classifier benchmark**: ${benchmark.accuracy === null ? "n/a" : `${(benchmark.accuracy * 100).toFixed(1)}%`} accuracy (${benchmark.correct}/${benchmark.totalSamples} known failures); this does not measure model accuracy.`,
     "",
     "## Evidence Artifacts",
     "",
